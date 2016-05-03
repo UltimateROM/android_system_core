@@ -132,9 +132,9 @@ module_tag := debug
 build_type := target
 build_target := NATIVE_TEST
 backtrace_test_multilib := both
-include $(LOCAL_PATH)/Android.build.mk
+#include $(LOCAL_PATH)/Android.build.mk
 build_type := host
-include $(LOCAL_PATH)/Android.build.mk
+#include $(LOCAL_PATH)/Android.build.mk
 
 #----------------------------------------------------------------------------
 # Special truncated libbacktrace library for mac.
