@@ -73,7 +73,7 @@ LOCAL_MODULE := libcutils
 LOCAL_SRC_FILES := $(commonSources) $(commonHostSources) dlmalloc_stubs.c
 LOCAL_STATIC_LIBRARIES := liblog
 ifneq ($(HOST_OS),windows)
-LOCAL_CFLAGS += -Werror
+LOCAL_CFLAGS += -std=gnu89
 endif
 LOCAL_MULTILIB := both
 include $(BUILD_HOST_STATIC_LIBRARY)
@@ -83,7 +83,7 @@ LOCAL_MODULE := libcutils
 LOCAL_SRC_FILES := $(commonSources) $(commonHostSources) dlmalloc_stubs.c
 LOCAL_SHARED_LIBRARIES := liblog
 ifneq ($(HOST_OS),windows)
-LOCAL_CFLAGS += -Werror
+LOCAL_CFLAGS += -std=gnu89
 endif
 LOCAL_MULTILIB := both
 include $(BUILD_HOST_SHARED_LIBRARY)
@@ -128,7 +128,7 @@ LOCAL_STATIC_LIBRARIES := liblog
 ifneq ($(ENABLE_CPUSETS),)
 LOCAL_CFLAGS += -DUSE_CPUSETS
 endif
-LOCAL_CFLAGS += -Werror -std=gnu90
+LOCAL_CFLAGS += -std=gnu90
 include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
@@ -140,7 +140,7 @@ LOCAL_SHARED_LIBRARIES := liblog
 ifneq ($(ENABLE_CPUSETS),)
 LOCAL_CFLAGS += -DUSE_CPUSETS
 endif
-LOCAL_CFLAGS += -Werror
+LOCAL_CFLAGS += -std=gnu89
 LOCAL_C_INCLUDES := $(libcutils_c_includes)
 include $(BUILD_SHARED_LIBRARY)
 
