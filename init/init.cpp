@@ -75,6 +75,11 @@ static int property_triggers_enabled = 0;
 #define BOARD_CHARGING_CMDLINE_VALUE "true"
 #endif
 
+#ifndef BOARD_LPM_BOOT_ARGUMENT_NAME
+#define BOARD_LPM_BOOT_ARGUMENT_NAME "lpm_boot"
+#define BOARD_LPM_BOOT_ARGUMENT_VALUE "1"
+#endif
+
 static char qemu[32];
 static char battchg_pause[32];
 
@@ -86,6 +91,8 @@ static char console_name[PROP_VALUE_MAX] = "/dev/console";
 static time_t process_needs_restart;
 
 static const char *ENV[32];
+
+static unsigned lpm_bootmode = 0;
 
 bool waiting_for_exec = false;
 
@@ -792,6 +799,12 @@ static void import_kernel_nv(char *name, bool for_emulator)
 
     if (!strcmp(name,"qemu")) {
         strlcpy(qemu, value, sizeof(qemu));
+#ifdef BOARD_LPM_BOOT_ARGUMENT_NAME
+    } else if (!strcmp(name,BOARD_LPM_BOOT_ARGUMENT_NAME)) {
+        if (!strcmp(value,BOARD_LPM_BOOT_ARGUMENT_VALUE)) {
+            lpm_bootmode = 1;
+        }
+#endif
     } else if (!strcmp(name,BOARD_CHARGING_CMDLINE_NAME)) {
         strlcpy(battchg_pause, value, sizeof(battchg_pause));
     } else if (!strncmp(name, "androidboot.", 12) && name_len > 12) {
@@ -1004,7 +1017,7 @@ static void selinux_initialize(bool in_kernel_domain) {
 
 static int charging_mode_booting(void) {
 #ifndef BOARD_CHARGING_MODE_BOOTING_LPM
-    return 0;
+    return lpm_bootmode;
 #else
     int f;
     char cmb;
