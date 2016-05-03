@@ -41,6 +41,8 @@
 #include <cutils/hashmap.h>
 #include <cutils/log.h>
 #include <cutils/multiuser.h>
+#include <cutils/properties.h>
+
 
 #include <private/android_filesystem_config.h>
 
@@ -102,6 +104,8 @@
 /* Pseudo-error constant used to indicate that no fuse status is needed
  * or that a reply has already been written. */
 #define NO_STATUS 1
+
+static bool worldWritableExternalStorage = false;
 
 /* Path to system-provided mapping of package name to appIds */
 static const char* const kPackagesListFile = "/data/system/packages.list";
@@ -419,7 +423,11 @@ static void attr_from_stat(struct fuse* fuse, struct fuse_attr *attr,
         attr->gid = multiuser_get_uid(node->userid, fuse->gid);
     }
 
+
     int visible_mode = 0775 & ~fuse->mask;
+
+    if (worldWritableExternalStorage) visible_mode = 0777;
+
     if (node->perm == PERM_PRE_ROOT) {
         /* Top of multi-user view should always be visible to ensure
          * secondary users can traverse inside. */
@@ -1923,7 +1931,15 @@ static void run(const char* source_path, const char* label, uid_t uid,
     exit(1);
 }
 
+static void initWorldWritableStorage() {
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.external_drive_world_rw", value, "");
+    worldWritableExternalStorage = (value[0] == '1');
+}
+
 int sdcard_main(int argc, char **argv) {
+    initWorldWritableStorage(); 
+
     const char *source_path = NULL;
     const char *label = NULL;
     uid_t uid = 0;
