@@ -940,14 +940,6 @@ static bool selinux_is_disabled(void)
     return false;
 }
 
-static bool selinux_is_enforcing(void)
-{
-    if (ALLOW_DISABLE_SELINUX) {
-        return selinux_status_from_cmdline() == SELINUX_ENFORCING;
-    }
-    return true;
-}
-
 int selinux_reload_policy(void)
 {
     if (selinux_is_disabled()) {
@@ -1001,7 +993,7 @@ static void selinux_initialize(bool in_kernel_domain) {
             security_failure();
         }
 
-        bool is_enforcing = selinux_is_enforcing();
+        bool is_enforcing = false;
         security_setenforce(is_enforcing);
 
         if (write_file("/sys/fs/selinux/checkreqprot", "0") == -1) {
