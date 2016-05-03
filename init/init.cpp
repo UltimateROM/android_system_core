@@ -1167,7 +1167,9 @@ int main(int argc, char** argv) {
             timeout = 0;
         }
 
+#if BOOTCHART
         bootchart_sample(&timeout);
+#endif
 
         epoll_event ev;
         int nr = TEMP_FAILURE_RETRY(epoll_wait(epoll_fd, &ev, 1, timeout));
