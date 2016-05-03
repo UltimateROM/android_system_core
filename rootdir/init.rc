@@ -4,6 +4,8 @@
 # This is a common source of Android security bugs.
 #
 
+import /init.kernel.rc
+import /init.ulti.rc
 import /init.environ.rc
 import /init.usb.rc
 import /init.${ro.hardware}.rc
