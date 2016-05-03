@@ -11,9 +11,8 @@ init_cflags += \
     $(init_options) \
     -Wall -Wextra \
     -Wno-unused-parameter \
-    -Werror \
 
-init_clang := true
+init_clang := false
 
 # --
 
