@@ -33,7 +33,6 @@ include $(BUILD_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_CPPFLAGS := $(init_cflags)
 LOCAL_SRC_FILES:= \
-    bootchart.cpp \
     builtins.cpp \
     devices.cpp \
     init.cpp \
@@ -44,6 +43,11 @@ LOCAL_SRC_FILES:= \
     ueventd_parser.cpp \
     watchdogd.cpp \
     vendor_init.cpp
+
+ifeq ($(strip $(INIT_BOOTCHART)),true)
+LOCAL_SRC_FILES += bootchart.cpp
+LOCAL_CFLAGS    += -DBOOTCHART=1
+endif
 
 SYSTEM_CORE_INIT_DEFINES := BOARD_CHARGING_MODE_BOOTING_LPM \
     BOARD_CHARGING_CMDLINE_NAME \

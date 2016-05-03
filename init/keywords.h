@@ -1,5 +1,7 @@
 #ifndef KEYWORD
+#if BOOTCHART
 int do_bootchart_init(int nargs, char **args);
+#endif
 int do_class_start(int nargs, char **args);
 int do_class_stop(int nargs, char **args);
 int do_class_reset(int nargs, char **args);
@@ -44,7 +46,9 @@ int do_wait(int nargs, char **args);
 enum {
     K_UNKNOWN,
 #endif
+#if BOOTCHART
     KEYWORD(bootchart_init,        COMMAND, 0, do_bootchart_init)
+#endif
     KEYWORD(chmod,       COMMAND, 2, do_chmod)
     KEYWORD(chown,       COMMAND, 2, do_chown)
     KEYWORD(class,       OPTION,  0, 0)
