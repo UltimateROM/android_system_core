@@ -78,7 +78,7 @@ include $(BUILD_HOST_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_MODULE := liblog
 LOCAL_SRC_FILES := $(liblog_target_sources)
-LOCAL_CFLAGS := -Werror $(liblog_cflags)
+LOCAL_CFLAGS := -std=gnu99 $(liblog_cflags)
 include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
