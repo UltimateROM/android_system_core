@@ -82,6 +82,12 @@ LOCAL_CFLAGS := -std=gnu99 $(liblog_cflags)
 include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
+LOCAL_MODULE := liblog_nolto
+LOCAL_SRC_FILES := $(liblog_target_sources)
+LOCAL_CFLAGS := -std=gnu99 $(liblog_cflags)
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
 LOCAL_MODULE := liblog
 LOCAL_WHOLE_STATIC_LIBRARIES := liblog
 LOCAL_CFLAGS := -Werror $(liblog_cflags)
