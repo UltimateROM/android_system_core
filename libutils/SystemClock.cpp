@@ -24,6 +24,7 @@
 #include <linux/rtc.h>
 #include <utils/Atomic.h>
 #include <linux/android_alarm.h>
+#include <cutils/properties.h>
 #endif
 
 #include <sys/time.h>
@@ -106,6 +107,8 @@ static inline void checkTimeStamps(int64_t timestamp,
 #define checkTimeStamps(timestamp, prevTimestampPtr, prevMethodPtr, curMethod)
 #endif
 
+int32_t debug_time = 0, debug_time_method = 0;
+
 /*
  * native public static long elapsedRealtimeNano();
  */
@@ -122,59 +125,71 @@ int64_t elapsedRealtimeNano()
 
     static int s_fd = -1;
 
-    if (clock_method < 0) {
-        pthread_mutex_lock(&clock_lock);
+    pthread_mutex_lock(&clock_lock);
+
+    debug_time = property_get_int32("debug.time", 0);
+    debug_time_method = property_get_int32("debug.time_method", -1);
+
+    switch (debug_time_method) {
+    case METHOD_CLOCK_GETTIME:
+         break;
+    case METHOD_IOCTL:
+         goto method_ioctl;
+         break;
+    case METHOD_SYSTEMTIME:
+         goto method_systemtime;
+         break;
+    default:
+         break;
     }
 
-    if (clock_method < 0 || clock_method == METHOD_IOCTL) {
-        if (s_fd == -1) {
-            int fd = open("/dev/alarm", O_RDONLY);
-            if (android_atomic_cmpxchg(-1, fd, &s_fd)) {
-                close(fd);
-            }
-        }
 
-        if (s_fd > -1) {
-            result = ioctl(s_fd,
-                    ANDROID_ALARM_GET_TIME(ANDROID_ALARM_ELAPSED_REALTIME), &ts);
-
-            if (result == 0) {
-                timestamp = seconds_to_nanoseconds(ts.tv_sec) + ts.tv_nsec;
-                checkTimeStamps(timestamp, &prevTimestamp, &prevMethod, METHOD_IOCTL);
-                if (clock_method < 0) {
-                    clock_method = METHOD_IOCTL;
-                    pthread_mutex_unlock(&clock_lock);
-                }
-                return timestamp;
-            }
-        }
-    }
-
+method_clock_gettime:
     // /dev/alarm doesn't exist, fallback to CLOCK_BOOTTIME
-    if (clock_method < 0 || clock_method == METHOD_CLOCK_GETTIME) {
-        result = clock_gettime(CLOCK_BOOTTIME, &ts);
+    result = clock_gettime(CLOCK_BOOTTIME, &ts);
+    if (result == 0) {
+        timestamp = seconds_to_nanoseconds(ts.tv_sec) + ts.tv_nsec;
+        checkTimeStamps(timestamp, &prevTimestamp, &prevMethod,
+                        METHOD_CLOCK_GETTIME);
+	if (debug_time)
+	        ALOGI("elapsedRealtimeNano: using METHOD_CLOCK_GETTIME");
+        goto unlock;
+    }
+
+method_ioctl:
+    if (s_fd == -1) {
+        int fd = open("/dev/alarm", O_RDONLY);
+        if (android_atomic_cmpxchg(-1, fd, &s_fd)) {
+            close(fd);
+        }
+    }
+
+    if (s_fd > -1) {
+        result = ioctl(s_fd,
+                ANDROID_ALARM_GET_TIME(ANDROID_ALARM_ELAPSED_REALTIME), &ts);
+
         if (result == 0) {
             timestamp = seconds_to_nanoseconds(ts.tv_sec) + ts.tv_nsec;
-            checkTimeStamps(timestamp, &prevTimestamp, &prevMethod,
-                            METHOD_CLOCK_GETTIME);
-            if (clock_method < 0) {
-                clock_method = METHOD_CLOCK_GETTIME;
-                pthread_mutex_unlock(&clock_lock);
-            }
-            return timestamp;
+            checkTimeStamps(timestamp, &prevTimestamp, &prevMethod, METHOD_IOCTL);
+            if (debug_time)
+                ALOGI("elapsedRealtimeNano: using METHOD_IOCTL");
+            goto unlock;
         }
     }
 
+method_systemtime:
     // XXX: there was an error, probably because the driver didn't
     // exist ... this should return
     // a real error, like an exception!
     timestamp = systemTime(SYSTEM_TIME_MONOTONIC);
     checkTimeStamps(timestamp, &prevTimestamp, &prevMethod,
                     METHOD_SYSTEMTIME);
-    if (clock_method < 0) {
-        clock_method = METHOD_SYSTEMTIME;
-        pthread_mutex_unlock(&clock_lock);
-    }
+    if (debug_time)
+         ALOGI("elapsedRealtimeNano: using METHOD_SYSTEMTIME");
+
+unlock:
+    pthread_mutex_unlock(&clock_lock);
+
     return timestamp;
 #else
     return systemTime(SYSTEM_TIME_MONOTONIC);
