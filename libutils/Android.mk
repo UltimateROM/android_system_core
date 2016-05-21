@@ -99,7 +99,8 @@ LOCAL_SHARED_LIBRARIES := \
         libdl
 
 LOCAL_MODULE:= libutils
-LOCAL_C_INCLUDES += external/safe-iop/include
+LOCAL_C_INCLUDES += external/safe-iop/include 
+LOCAL_C_INCLUDES += bionic/libc/include
 include $(BUILD_STATIC_LIBRARY)
 
 # For the device, shared
