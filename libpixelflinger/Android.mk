@@ -21,11 +21,11 @@ PIXELFLINGER_SRC_FILES += \
 	codeflinger/load_store.cpp \
 	codeflinger/blending.cpp \
 	codeflinger/texturing.cpp \
-	fixed.cpp.arm \
-	picker.cpp.arm \
-	pixelflinger.cpp.arm \
-	trap.cpp.arm \
-	scanline.cpp.arm \
+	fixed.cpp \
+	picker.cpp \
+	pixelflinger.cpp \
+	trap.cpp \
+	scanline.cpp \
 
 endif
 
@@ -80,6 +80,7 @@ LOCAL_SRC_FILES_x86_64 := $(PIXELFLINGER_SRC_FILES_x86)
 LOCAL_SRC_FILES_mips := $(PIXELFLINGER_SRC_FILES_mips)
 LOCAL_CFLAGS := $(PIXELFLINGER_CFLAGS)
 LOCAL_CLANG := true
+LOCAL_ARM_MODE = arm
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 LOCAL_C_INCLUDES += $(LOCAL_EXPORT_C_INCLUDE_DIRS) \
 		    external/safe-iop/include
