@@ -107,7 +107,7 @@ static inline void checkTimeStamps(int64_t timestamp,
 #define checkTimeStamps(timestamp, prevTimestampPtr, prevMethodPtr, curMethod)
 #endif
 
-int32_t debug_time = 0, debug_time_method = 0;
+int32_t debug_time = 0, debug_time_method = 1;
 
 /*
  * native public static long elapsedRealtimeNano();
@@ -128,7 +128,7 @@ int64_t elapsedRealtimeNano()
     pthread_mutex_lock(&clock_lock);
 
     debug_time = property_get_int32("debug.time", 0);
-    debug_time_method = property_get_int32("debug.time_method", -1);
+    debug_time_method = property_get_int32("debug.time_method", 1);
 
     switch (debug_time_method) {
     case METHOD_CLOCK_GETTIME:
