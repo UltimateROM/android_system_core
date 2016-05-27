@@ -196,4 +196,36 @@ unlock:
 #endif
 }
 
+
+/*
+ * native public static long elapsedRealtimeNano();
+ */
+int64_t elapsedRealtimeNano1()
+{
+    struct timespec ts;
+    int result;
+    int64_t timestamp;
+#if DEBUG_TIMESTAMP
+    static volatile int64_t prevTimestamp;
+    static volatile int prevMethod;
+#endif
+
+    static int s_fd = -1;
+
+    //pthread_mutex_lock(&clock_lock);
+
+    // /dev/alarm doesn't exist, fallback to CLOCK_BOOTTIME
+    result = clock_gettime(CLOCK_BOOTTIME, &ts);
+    if (result == 0) {
+        timestamp = seconds_to_nanoseconds(ts.tv_sec) + ts.tv_nsec;
+        checkTimeStamps(timestamp, &prevTimestamp, &prevMethod,
+                        METHOD_CLOCK_GETTIME);
+	if (debug_time)
+	        ALOGI("elapsedRealtimeNano: using METHOD_CLOCK_GETTIME");
+    }
+    //pthread_mutex_unlock(&clock_lock);
+
+    return timestamp;
+}
+
 }; // namespace android
