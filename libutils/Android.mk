@@ -43,7 +43,7 @@ ifeq ($(BOARD_USES_STE_HARDWARE),true)
 endif
 
 
-host_commonCflags := -DLIBUTILS_NATIVE=1 $(TOOL_CFLAGS) -Werror
+host_commonCflags := -DLIBUTILS_NATIVE=1 $(TOOL_CFLAGS)
 
 # For the host
 # =====================================================
@@ -78,7 +78,7 @@ LOCAL_SRC_FILES:= \
 ifeq ($(TARGET_ARCH),mips)
 LOCAL_CFLAGS += -DALIGN_DOUBLE
 endif
-LOCAL_CFLAGS += -Werror -fvisibility=protected
+LOCAL_CFLAGS += -fvisibility=protected
 
 LOCAL_STATIC_LIBRARIES := \
 	libcutils \
@@ -105,7 +105,7 @@ LOCAL_SHARED_LIBRARIES := \
         libcutils \
         libdl \
         liblog
-LOCAL_CFLAGS := -Werror
+LOCAL_CFLAGS :=
 LOCAL_C_INCLUDES += external/safe-iop/include
 
 LOCAL_CLANG := true

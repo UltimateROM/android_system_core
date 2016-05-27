@@ -42,6 +42,8 @@ namespace android {
 static pthread_mutex_t clock_lock = PTHREAD_MUTEX_INITIALIZER;
 static int clock_method = -1;
 
+static int debug_time = 0;
+
 /*
  * native public static long uptimeMillis();
  */
@@ -57,6 +59,14 @@ int64_t uptimeMillis()
 int64_t elapsedRealtime()
 {
 	return nanoseconds_to_milliseconds(elapsedRealtimeNano());
+}
+
+/*
+ * native public static long elapsedRealtime1();
+ */
+int64_t elapsedRealtime1()
+{
+	return nanoseconds_to_milliseconds(elapsedRealtimeNano1());
 }
 
 #define METHOD_CLOCK_GETTIME    0
@@ -178,6 +188,38 @@ int64_t elapsedRealtimeNano()
 #else
     return systemTime(SYSTEM_TIME_MONOTONIC);
 #endif
+}
+
+
+/*
+ * native public static long elapsedRealtimeNano1();
+ */
+int64_t elapsedRealtimeNano1()
+{
+    struct timespec ts;
+    int result;
+    int64_t timestamp;
+#if DEBUG_TIMESTAMP
+    static volatile int64_t prevTimestamp;
+    static volatile int prevMethod;
+#endif
+
+    static int s_fd = -1;
+
+    //pthread_mutex_lock(&clock_lock);
+
+    // /dev/alarm doesn't exist, fallback to CLOCK_BOOTTIME
+    result = clock_gettime(CLOCK_BOOTTIME, &ts);
+    if (result == 0) {
+        timestamp = seconds_to_nanoseconds(ts.tv_sec) + ts.tv_nsec;
+        checkTimeStamps(timestamp, &prevTimestamp, &prevMethod,
+                        METHOD_CLOCK_GETTIME);
+	if (debug_time)
+	        ALOGI("elapsedRealtimeNano: using METHOD_CLOCK_GETTIME");
+    }
+    //pthread_mutex_unlock(&clock_lock);
+
+    return timestamp;
 }
 
 }; // namespace android
