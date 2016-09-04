@@ -11,8 +11,7 @@ init_options += -DLOG_UEVENTS=0
 init_cflags += \
     $(init_options) \
     -Wall -Wextra \
-    -Wno-unused-parameter \
-    -Werror \
+    -Wno-unused-parameter
 
 # --
 
