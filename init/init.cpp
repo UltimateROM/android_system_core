@@ -262,9 +262,7 @@ ret:
 }
 
 static void security_failure() {
-    ERROR("Security failure; rebooting into recovery mode...\n");
-    android_reboot(ANDROID_RB_RESTART2, 0, "recovery");
-    while (true) { pause(); }  // never reached
+	return;
 }
 
 #define MMAP_RND_PATH "/proc/sys/vm/mmap_rnd_bits"

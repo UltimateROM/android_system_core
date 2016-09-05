@@ -93,6 +93,8 @@ LOCAL_MODULE := libutils
 LOCAL_CLANG := true
 LOCAL_SANITIZE := integer
 LOCAL_C_INCLUDES += external/safe-iop/include
+LOCAL_REPORT_FLAGS := true
+
 include $(BUILD_STATIC_LIBRARY)
 
 # For the device, shared
@@ -110,6 +112,7 @@ LOCAL_C_INCLUDES += external/safe-iop/include
 
 LOCAL_CLANG := true
 LOCAL_SANITIZE := integer
+LOCAL_REPORT_FLAGS := true
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
