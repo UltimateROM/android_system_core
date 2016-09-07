@@ -562,7 +562,7 @@ static int do_mount_all(const std::vector<std::string>& args) {
         ERROR("fs_mgr_mount_all suggested recovery, so wiping data via recovery.\n");
         ret = wipe_data_via_recovery("wipe_data_via_recovery");
         /* If reboot worked, there is no return. */
-    } else if (ret == FS_MGR_MNTALL_DEV_FILE_ENCRYPTED) {
+    } else if (ret == FS_MGR_MNTALL_DEV_DEFAULT_FILE_ENCRYPTED) {
         if (e4crypt_install_keyring()) {
             return -1;
         }
@@ -572,6 +572,13 @@ static int do_mount_all(const std::vector<std::string>& args) {
         // Although encrypted, we have device key, so we do not need to
         // do anything different from the nonencrypted case.
         ActionManager::GetInstance().QueueEventTrigger("nonencrypted");
+    } else if (ret == FS_MGR_MNTALL_DEV_NON_DEFAULT_FILE_ENCRYPTED) {
+        if (e4crypt_install_keyring()) {
+            return -1;
+        }
+        property_set("ro.crypto.state", "encrypted");
+        property_set("ro.crypto.type", "file");
+        property_set("vold.decrypt", "trigger_restart_min_framework");
     } else if (ret > 0) {
         ERROR("fs_mgr_mount_all returned unexpected error %d\n", ret);
     }
