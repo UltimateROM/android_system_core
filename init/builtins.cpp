@@ -553,9 +553,9 @@ static int do_mount_all(const std::vector<std::string>& args) {
         ActionManager::GetInstance().QueueEventTrigger("defaultcrypto");
     } else if (ret == FS_MGR_MNTALL_DEV_NOT_ENCRYPTED) {
         property_set("ro.crypto.state", "unencrypted");
-        ActionManager::GetInstance().QueueEventTrigger("nonencrypted");
-    } else if (ret == FS_MGR_MNTALL_DEV_NOT_ENCRYPTABLE) {
-        property_set("ro.crypto.state", "unsupported");
+        /* If fs_mgr determined this is an unencrypted device, then trigger
+         * that action.
+         */
         ActionManager::GetInstance().QueueEventTrigger("nonencrypted");
     } else if (ret == FS_MGR_MNTALL_DEV_NEEDS_RECOVERY) {
         /* Setup a wipe via recovery, and reboot into recovery */
