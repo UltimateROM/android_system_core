@@ -539,6 +539,8 @@ int fs_mgr_mount_all(struct fstab *fstab)
     int mret = -1;
     int mount_errno = 0;
     int attempted_idx = -1;
+    int fs_mgr_is_encryptable_;
+
 
     if (!fstab) {
         return -1;
@@ -651,8 +653,10 @@ int fs_mgr_mount_all(struct fstab *fstab)
                 continue;
             }
         }
-        if (mret && mount_errno != EBUSY && mount_errno != EACCES &&
-            fs_mgr_is_encryptable(&fstab->recs[attempted_idx])) {
+
+	fs_mgr_is_encryptable_ = fs_mgr_is_encryptable(&fstab->recs[attempted_idx]);
+
+        if (mret && mount_errno != EBUSY && mount_errno != EACCES && fs_mgr_is_encryptable_) {
             if (wiped) {
                 ERROR("%s(): %s is wiped and %s %s is encryptable. Suggest recovery...\n", __func__,
                       fstab->recs[attempted_idx].blk_device, fstab->recs[attempted_idx].mount_point,
@@ -673,6 +677,7 @@ int fs_mgr_mount_all(struct fstab *fstab)
             }
             encryptable = FS_MGR_MNTALL_DEV_MIGHT_BE_ENCRYPTED;
         } else {
+		ERROR("mret=%d; mount_errno=%d; fs_mgr_is_encryptable = %d\n", mret, mount_errno, fs_mgr_is_encryptable_);
             if (fs_mgr_is_nofail(&fstab->recs[attempted_idx])) {
                 ERROR("Ignoring failure to mount an un-encryptable or wiped partition on"
                        "%s at %s options: %s error: %s\n",
