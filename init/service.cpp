@@ -343,42 +343,6 @@ bool Service::Start() {
         return false;
     }
 
-    std::string scon;
-    if (!seclabel_.empty()) {
-        scon = seclabel_;
-    } else {
-        char* mycon = nullptr;
-        char* fcon = nullptr;
-
-        INFO("computing context for service '%s'\n", args_[0].c_str());
-        int rc = getcon(&mycon);
-        if (rc < 0) {
-            ERROR("could not get context while starting '%s'\n", name_.c_str());
-            return false;
-        }
-
-        rc = getfilecon(args_[0].c_str(), &fcon);
-        if (rc < 0) {
-            ERROR("could not get context while starting '%s'\n", name_.c_str());
-            free(mycon);
-            return false;
-        }
-
-        char* ret_scon = nullptr;
-        rc = security_compute_create(mycon, fcon, string_to_security_class("process"),
-                                     &ret_scon);
-        if (rc == 0) {
-            scon = ret_scon;
-            free(ret_scon);
-        }
-        free(mycon);
-        free(fcon);
-        if (rc < 0) {
-            ERROR("could not get context while starting '%s'\n", name_.c_str());
-            return false;
-        }
-    }
-
     NOTICE("Starting service '%s'...\n", name_.c_str());
 
     pid_t pid = fork();
@@ -393,11 +357,9 @@ bool Service::Start() {
             int socket_type = ((si.type == "stream" ? SOCK_STREAM :
                                 (si.type == "dgram" ? SOCK_DGRAM :
                                  SOCK_SEQPACKET)));
-            const char* socketcon =
-                !si.socketcon.empty() ? si.socketcon.c_str() : scon.c_str();
 
             int s = create_socket(si.name.c_str(), socket_type, si.perm,
-                                  si.uid, si.gid, socketcon);
+                                  si.uid, si.gid, NULL);
             if (s >= 0) {
                 PublishSocket(si.name, s);
             }
@@ -446,13 +408,6 @@ bool Service::Start() {
                 _exit(127);
             }
         }
-        if (!seclabel_.empty()) {
-            if (setexeccon(seclabel_.c_str()) < 0) {
-                ERROR("cannot setexeccon('%s'): %s\n",
-                      seclabel_.c_str(), strerror(errno));
-                _exit(127);
-            }
-        }
 
         std::vector<char*> strs;
         for (const auto& s : args_) {
@@ -475,12 +430,6 @@ bool Service::Start() {
     time_started_ = gettime();
     pid_ = pid;
     flags_ |= SVC_RUNNING;
-
-    if ((flags_ & SVC_EXEC) != 0) {
-        INFO("SVC_EXEC pid %d (uid %d gid %d+%zu context %s) started; waiting...\n",
-             pid_, uid_, gid_, supp_gids_.size(),
-             !seclabel_.empty() ? seclabel_.c_str() : "default");
-    }
 
     NotifyStateChange("running");
     return true;

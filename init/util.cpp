@@ -105,21 +105,12 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
     int fd, ret, savederrno;
     char *filecon;
 
-    if (socketcon) {
-        if (setsockcreatecon(socketcon) == -1) {
-            ERROR("setsockcreatecon(\"%s\") failed: %s\n", socketcon, strerror(errno));
-            return -1;
-        }
-    }
 
     fd = socket(PF_UNIX, type, 0);
     if (fd < 0) {
         ERROR("Failed to open socket '%s': %s\n", name, strerror(errno));
         return -1;
     }
-
-    if (socketcon)
-        setsockcreatecon(NULL);
 
     memset(&addr, 0 , sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -133,11 +124,6 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
     }
 
     filecon = NULL;
-    if (sehandle) {
-        ret = selabel_lookup(sehandle, &filecon, addr.sun_path, S_IFSOCK);
-        if (ret == 0)
-            setfscreatecon(filecon);
-    }
 
     ret = bind(fd, (struct sockaddr *) &addr, sizeof (addr));
     savederrno = errno;

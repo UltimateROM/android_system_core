@@ -452,6 +452,7 @@ out:
     return ret;
 }
 
+#if 0
 // Check to see if a mountable volume has encryption requirements
 static int handle_encryptable(struct fstab *fstab, const struct fstab_rec* rec)
 {
@@ -523,6 +524,7 @@ static int handle_encryptable(struct fstab *fstab, const struct fstab_rec* rec)
 
     return FS_MGR_MNTALL_DEV_NOT_ENCRYPTED;
 }
+#endif
 
 /* When multiple fstab records share the same mount_point, it will
  * try to mount each one in turn, and ignore any duplicates after a
@@ -594,6 +596,7 @@ int fs_mgr_mount_all(struct fstab *fstab)
         i = last_idx_inspected;
         mount_errno = errno;
 
+#if 0
         /* Deal with encryptability. */
         if (!mret) {
             int status = handle_encryptable(fstab, &fstab->recs[attempted_idx]);
@@ -614,7 +617,7 @@ int fs_mgr_mount_all(struct fstab *fstab)
             /* Success!  Go get the next one */
             continue;
         }
-
+#endif
         /* mount(2) returned an error, handle the encryptable/formattable case */
         bool wiped = partition_wiped(fstab->recs[top_idx].blk_device);
         if (mret && mount_errno != EBUSY && mount_errno != EACCES &&
