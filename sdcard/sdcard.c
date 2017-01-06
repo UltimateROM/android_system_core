@@ -1964,8 +1964,7 @@ static int sdcardfs_setup(const char *source_path, const char *dest_path, uid_t 
     char opts[256];
 
     snprintf(opts, sizeof(opts),
-            "fsuid=%d,fsgid=%d,%smask=%d,userid=%d,gid=%d",
-            fsuid, fsgid, multi_user?"multiuser,":"", mask, userid, gid);
+            "uid=1023,gid=1023,wgid=1023,derive=unified");
 
     if (mount(source_path, dest_path, "sdcardfs",
                         MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME, opts) != 0) {
