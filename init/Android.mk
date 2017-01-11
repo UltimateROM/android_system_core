@@ -17,9 +17,7 @@ endif
 
 init_cflags += \
     $(init_options) \
-    -Wall -Wextra \
-    -Wno-unused-parameter \
-    -Werror \
+    -Wall -Wextra
 
 # --
 
@@ -55,7 +53,7 @@ LOCAL_SRC_FILES:= \
     service.cpp \
     util.cpp \
 
-LOCAL_STATIC_LIBRARIES := libbase libselinux
+LOCAL_STATIC_LIBRARIES := libbase
 LOCAL_MODULE := libinit
 LOCAL_SANITIZE := integer
 LOCAL_CLANG := true
@@ -116,7 +114,6 @@ LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
 
 LOCAL_STATIC_LIBRARIES := \
     libinit \
-    libbootloader_message \
     libfs_mgr \
     libfec \
     libfec_rs \
@@ -127,7 +124,6 @@ LOCAL_STATIC_LIBRARIES := \
     libbase \
     libutils \
     libc \
-    libselinux \
     liblog \
     libcrypto_utils_static \
     libcrypto_static \

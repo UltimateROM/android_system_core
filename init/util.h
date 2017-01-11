@@ -62,9 +62,14 @@ void open_devnull_stdio(void);
 void import_kernel_cmdline(bool in_qemu,
                            const std::function<void(const std::string&, const std::string&, bool)>&);
 int make_dir(const char *path, mode_t mode);
+#if 0
 int restorecon(const char *pathname);
 int restorecon_recursive(const char *pathname);
 int restorecon_recursive_skipce(const char *pathname);
+#endif
+
+#include "dummy.h"
+
 std::string bytes_to_hex(const uint8_t *bytes, size_t bytes_len);
 bool is_dir(const char* pathname);
 bool expand_props(const std::string& src, std::string* dst);

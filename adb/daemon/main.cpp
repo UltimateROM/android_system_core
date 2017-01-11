@@ -33,7 +33,6 @@
 
 #include "cutils/properties.h"
 #include "private/android_filesystem_config.h"
-#include "selinux/android.h"
 
 #include "adb.h"
 #include "adb_auth.h"
@@ -142,11 +141,6 @@ static void drop_privileges(int server_port) {
     } else {
         // minijail_enter() will abort if any priv-dropping step fails.
         minijail_enter(jail.get());
-        if ((root_seclabel != nullptr) && (is_selinux_enabled() > 0)) {
-            if (setcon(root_seclabel) < 0) {
-                LOG(FATAL) << "Could not set selinux context";
-            }
-        }
         std::string error;
         std::string local_name =
             android::base::StringPrintf("tcp:%d", server_port);

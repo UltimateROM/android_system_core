@@ -36,9 +36,9 @@
 
 #include <mtd/mtd-user.h>
 
-#include <selinux/selinux.h>
-#include <selinux/label.h>
-#include <selinux/android.h>
+//#include <selinux/selinux.h>
+//#include <selinux/label.h>
+//#include <selinux/android.h>
 
 #include <android-base/file.h>
 #include <android-base/stringprintf.h>
@@ -55,6 +55,7 @@
 #include "action.h"
 #include "bootchart.h"
 #include "devices.h"
+#include "dummy.h"
 #include "import_parser.h"
 #include "init.h"
 #include "init_parser.h"
@@ -440,6 +441,7 @@ static int queue_property_triggers_action(const std::vector<std::string>& args)
     return 0;
 }
 
+#if 0
 static void selinux_init_all_handles(void)
 {
     sehandle = selinux_android_file_context_handle();
@@ -448,7 +450,7 @@ static void selinux_init_all_handles(void)
 }
 
 enum selinux_enforcing_status { SELINUX_DISABLED, SELINUX_PERMISSIVE, SELINUX_ENFORCING };
-
+#endif
 #if 0
 static selinux_enforcing_status selinux_status_from_cmdline() {
     selinux_enforcing_status status = SELINUX_ENFORCING;
@@ -485,7 +487,7 @@ static bool selinux_is_disabled(void)
 #endif
     return false;
 }
-
+#if 0
 int selinux_reload_policy(void)
 {
     if (selinux_is_disabled()) {
@@ -504,10 +506,9 @@ int selinux_reload_policy(void)
     if (sehandle_prop)
         selabel_close(sehandle_prop);
 
-    selinux_init_all_handles();
+    //selinux_init_all_handles();
     return 0;
 }
-
 static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_t len) {
 
     property_audit_data *d = reinterpret_cast<property_audit_data*>(data);
@@ -521,6 +522,7 @@ static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_
             d->cr->pid, d->cr->uid, d->cr->gid);
     return 0;
 }
+#endif
 
 static void security_failure() {
     ERROR("Security failure; rebooting into recovery mode...\n");
@@ -528,6 +530,7 @@ static void security_failure() {
     while (true) { pause(); }  // never reached
 }
 
+#if 0
 static void selinux_initialize(bool in_kernel_domain) {
     Timer t;
 
@@ -561,6 +564,7 @@ static void selinux_initialize(bool in_kernel_domain) {
         selinux_init_all_handles();
     }
 }
+#endif
 
 static int charging_mode_booting(void) {
 #ifndef BOARD_CHARGING_MODE_BOOTING_LPM
@@ -636,15 +640,17 @@ int main(int argc, char** argv) {
     }
 
     // Set up SELinux, including loading the SELinux policy if we're in the kernel domain.
-    selinux_initialize(is_first_stage);
+    //selinux_initialize(is_first_stage);
 
     // If we're in the kernel domain, re-exec init to transition to the init domain now
     // that the SELinux policy has been loaded.
     if (is_first_stage) {
+#if 0
         if (restorecon("/init") == -1) {
             ERROR("restorecon failed: %s\n", strerror(errno));
             security_failure();
         }
+#endif
         char* path = argv[0];
         char* args[] = { path, const_cast<char*>("--second-stage"), nullptr };
         if (execv(path, args) == -1) {

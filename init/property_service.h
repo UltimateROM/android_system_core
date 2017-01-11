@@ -22,6 +22,7 @@
 #include <sys/system_properties.h>
 #include <string>
 
+#include "dummy.h"
 struct property_audit_data {
     ucred *cr;
     const char* name;

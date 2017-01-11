@@ -23,9 +23,14 @@
 #include <errno.h>
 #include <time.h>
 #include <ftw.h>
-
+#if 0
 #include <selinux/label.h>
 #include <selinux/android.h>
+#endif
+
+#include <stdarg.h>
+#include <unistd.h>
+#include <stdbool.h>
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -105,8 +110,8 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
     int fd, ret, savederrno;
     char *filecon;
 
-    if (socketcon)
-        setsockcreatecon(socketcon);
+    //if (socketcon)
+    //   setsockcreatecon(socketcon);
 
     fd = socket(PF_UNIX, type, 0);
     if (fd < 0) {
@@ -114,8 +119,8 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
         return -1;
     }
 
-    if (socketcon)
-        setsockcreatecon(NULL);
+    //if (socketcon)
+    //    setsockcreatecon(NULL);
 
     memset(&addr, 0 , sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -129,18 +134,19 @@ int create_socket(const char *name, int type, mode_t perm, uid_t uid,
     }
 
     filecon = NULL;
+#if 0
     if (sehandle) {
         ret = selabel_lookup(sehandle, &filecon, addr.sun_path, S_IFSOCK);
         if (ret == 0)
             setfscreatecon(filecon);
     }
-
+#endif
     ret = bind(fd, (struct sockaddr *) &addr, sizeof (addr));
     savederrno = errno;
-
+#if 0
     setfscreatecon(NULL);
     freecon(filecon);
-
+#endif
     if (ret) {
         ERROR("Failed to bind socket '%s': %s\n", name, strerror(savederrno));
         goto out_unlink;
@@ -453,43 +459,22 @@ int make_dir(const char *path, mode_t mode)
 {
     int rc;
 
-    char *secontext = NULL;
-
+#if 0
     if (sehandle) {
         selabel_lookup(sehandle, &secontext, path, mode);
         setfscreatecon(secontext);
     }
-
+#endif
     rc = mkdir(path, mode);
-
+#if 0
     if (secontext) {
         int save_errno = errno;
         freecon(secontext);
         setfscreatecon(NULL);
         errno = save_errno;
     }
-
+#endif
     return rc;
-}
-
-int restorecon(const char* pathname)
-{
-    return selinux_android_restorecon(pathname, 0);
-}
-
-#define RESTORECON_RECURSIVE_FLAGS \
-        (SELINUX_ANDROID_RESTORECON_FORCE | \
-        SELINUX_ANDROID_RESTORECON_RECURSE)
-
-int restorecon_recursive(const char* pathname)
-{
-    return selinux_android_restorecon(pathname, RESTORECON_RECURSIVE_FLAGS);
-}
-
-int restorecon_recursive_skipce(const char* pathname)
-{
-    return selinux_android_restorecon(pathname,
-            SELINUX_ANDROID_RESTORECON_RECURSE | SELINUX_ANDROID_RESTORECON_SKIPCE);
 }
 
 /*

@@ -138,7 +138,64 @@ LOCAL_STATIC_LIBRARIES := libcrypto_utils_static libcrypto_static libbase
 LOCAL_C_INCLUDES_windows := development/host/windows/usb/api/
 LOCAL_MULTILIB := first
 
-include $(BUILD_HOST_STATIC_LIBRARY)
+#include $(BUILD_HOST_STATIC_LIBRARY)
+
+# adbd device daemon
+# =========================================================
+
+include $(CLEAR_VARS)
+
+LOCAL_CLANG := true
+
+LOCAL_SRC_FILES := \
+    daemon/main.cpp \
+    services.cpp \
+    file_sync_service.cpp \
+    framebuffer_service.cpp \
+    remount_service.cpp \
+    set_verity_enable_state_service.cpp \
+    shell_service.cpp \
+    shell_service_protocol.cpp \
+
+LOCAL_CFLAGS := \
+    $(ADB_COMMON_CFLAGS) \
+    $(ADB_COMMON_linux_CFLAGS) \
+    -DADB_HOST=0 \
+    -D_GNU_SOURCE \
+    -Wno-deprecated-declarations \
+
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
+
+ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
+LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
+endif
+
+LOCAL_MODULE := adbd
+
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
+LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
+LOCAL_C_INCLUDES += system/extras/ext4_utils
+
+LOCAL_SANITIZE := $(adb_target_sanitize)
+LOCAL_STATIC_LIBRARIES := \
+    libadbd \
+    libbase \
+    libfs_mgr \
+    libfec \
+    libfec_rs \
+    liblog \
+    libext4_utils_static \
+    libsquashfs_utils \
+    libcutils \
+    libbase \
+    libcrypto_utils_static \
+    libcrypto_static \
+    libminijail
+
+include $(BUILD_EXECUTABLE)
+
 
 include $(CLEAR_VARS)
 LOCAL_CLANG := true
@@ -305,59 +362,3 @@ $(call dist-for-goals,win_sdk,$(ALL_MODULES.host_cross_adb.BUILT))
 endif
 
 
-# adbd device daemon
-# =========================================================
-
-include $(CLEAR_VARS)
-
-LOCAL_CLANG := true
-
-LOCAL_SRC_FILES := \
-    daemon/main.cpp \
-    services.cpp \
-    file_sync_service.cpp \
-    framebuffer_service.cpp \
-    remount_service.cpp \
-    set_verity_enable_state_service.cpp \
-    shell_service.cpp \
-    shell_service_protocol.cpp \
-
-LOCAL_CFLAGS := \
-    $(ADB_COMMON_CFLAGS) \
-    $(ADB_COMMON_linux_CFLAGS) \
-    -DADB_HOST=0 \
-    -D_GNU_SOURCE \
-    -Wno-deprecated-declarations \
-
-LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
-
-ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
-LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
-LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
-endif
-
-LOCAL_MODULE := adbd
-
-LOCAL_FORCE_STATIC_EXECUTABLE := true
-LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
-LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
-LOCAL_C_INCLUDES += system/extras/ext4_utils
-
-LOCAL_SANITIZE := $(adb_target_sanitize)
-LOCAL_STATIC_LIBRARIES := \
-    libadbd \
-    libbase \
-    libfs_mgr \
-    libfec \
-    libfec_rs \
-    libselinux \
-    liblog \
-    libext4_utils_static \
-    libsquashfs_utils \
-    libcutils \
-    libbase \
-    libcrypto_utils_static \
-    libcrypto_static \
-    libminijail
-
-include $(BUILD_EXECUTABLE)

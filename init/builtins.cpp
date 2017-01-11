@@ -41,14 +41,14 @@
 #include <ext4_crypt.h>
 #include <ext4_crypt_init_extensions.h>
 
-#include <selinux/selinux.h>
-#include <selinux/label.h>
+//#include <selinux/selinux.h>
+//#include <selinux/label.h>
 
 #include <fs_mgr.h>
 #include <android-base/file.h>
 #include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
-#include <bootloader_message/bootloader_message.h>
+//#include <bootloader_message/bootloader_message.h>
 #include <cutils/partition_utils.h>
 #include <cutils/android_reboot.h>
 #include <logwrap/logwrap.h>
@@ -159,10 +159,12 @@ static void turnOffBacklight() {
 static int wipe_data_via_recovery(const std::string& reason) {
     const std::vector<std::string> options = {"--wipe_data", std::string() + "--reason=" + reason};
     std::string err;
+#if 0
     if (!write_bootloader_message(options, &err)) {
         ERROR("failed to set bootloader message: %s", err.c_str());
         return -1;
     }
+#endif
     android_reboot(ANDROID_RB_RESTART2, 0, "recovery");
     while (1) { pause(); }  // never reached
 }
@@ -1086,17 +1088,18 @@ static int do_chmod(const std::vector<std::string>& args) {
 
 static int do_restorecon(const std::vector<std::string>& args) {
     int ret = 0;
-
+#if 0
     for (auto it = std::next(args.begin()); it != args.end(); ++it) {
         if (restorecon(it->c_str()) < 0)
             ret = -errno;
     }
+#endif
     return ret;
 }
 
 static int do_restorecon_recursive(const std::vector<std::string>& args) {
     int ret = 0;
-
+#if 0
     for (auto it = std::next(args.begin()); it != args.end(); ++it) {
         /* The contents of CE paths are encrypted on FBE devices until user
          * credentials are presented (filenames inside are mangled), so we need
@@ -1105,6 +1108,7 @@ static int do_restorecon_recursive(const std::vector<std::string>& args) {
             ret = -errno;
         }
     }
+#endif
     return ret;
 }
 

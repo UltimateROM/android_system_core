@@ -23,7 +23,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include <selinux/selinux.h>
+//#include <selinux/selinux.h>
 
 #include <android-base/file.h>
 #include <android-base/stringprintf.h>
@@ -358,7 +358,8 @@ bool Service::Start() {
     }
 
     std::string scon;
-    if (is_selinux_enabled() > 0) {
+#if 0
+    if (is_selinux_enabled_() > 0) {
 	    if (!seclabel_.empty()) {
 	        scon = seclabel_;
 	    } else {
@@ -394,7 +395,7 @@ bool Service::Start() {
         	}
     	}
     }
-
+#endif
     NOTICE("Starting service '%s'...\n", name_.c_str());
 
     pid_t pid = fork();
@@ -462,13 +463,15 @@ bool Service::Start() {
                 _exit(127);
             }
         }
+#if 0
         if (!seclabel_.empty()) {
-            if (is_selinux_enabled() > 0 && setexeccon(seclabel_.c_str()) < 0) {
+            if (is_selinux_enabled_() > 0 && setexeccon(seclabel_.c_str()) < 0) {
                 ERROR("cannot setexeccon('%s'): %s\n",
                       seclabel_.c_str(), strerror(errno));
                 _exit(127);
             }
         }
+#endif
 
         std::vector<std::string> expanded_args;
         std::vector<char*> strs;
