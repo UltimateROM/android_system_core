@@ -62,6 +62,17 @@ on init
     mkdir /cache 0770 system cache
     mkdir /config 0500 root root
 
+    # Create energy-aware scheduler tuning nodes
+    mkdir /sys/fs/cgroup/stune
+    mount cgroup none /sys/fs/cgroup/stune schedtune
+    mkdir /sys/fs/cgroup/stune/foreground
+    chown system system /sys/fs/cgroup/stune
+    chown system system /sys/fs/cgroup/stune/foreground
+    chown system system /sys/fs/cgroup/stune/tasks
+    chown system system /sys/fs/cgroup/stune/foreground/tasks
+    chmod 0664 /sys/fs/cgroup/stune/tasks
+    chmod 0664 /sys/fs/cgroup/stune/foreground/tasks
+
     # Mount staging areas for devices managed by vold
     # See storage config details at http://source.android.com/tech/storage/
     mkdir /mnt 0755 root system
@@ -170,13 +181,16 @@ on init
     chown system system /dev/cpuset/foreground
     chown system system /dev/cpuset/foreground/boost
     chown system system /dev/cpuset/background
+    chown system system /dev/cpuset/system-background
     chown system system /dev/cpuset/tasks
     chown system system /dev/cpuset/foreground/tasks
     chown system system /dev/cpuset/foreground/boost/tasks
     chown system system /dev/cpuset/background/tasks
+    chown system system /dev/cpuset/system-background/tasks
     chmod 0664 /dev/cpuset/foreground/tasks
     chmod 0664 /dev/cpuset/foreground/boost/tasks
     chmod 0664 /dev/cpuset/background/tasks
+    chmod 0664 /dev/cpuset/system-background/tasks
     chmod 0664 /dev/cpuset/tasks
 
 
