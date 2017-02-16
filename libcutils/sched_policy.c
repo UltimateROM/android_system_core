@@ -64,12 +64,10 @@ static char proc_name[32] = {0};
 static int bg_cgroup_fd = -1;
 static int fg_cgroup_fd = -1;
 
-#ifdef USE_CPUSETS
 // File descriptors open to /dev/cpuset/../tasks, setup by initialize, or -1 on error
 static int system_bg_cpuset_fd = -1;
 static int bg_cpuset_fd = -1;
 static int fg_cpuset_fd = -1;
-#endif
 
 static int write_tid_to_fd(int tid, int fd)
 {
