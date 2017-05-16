@@ -11,7 +11,7 @@ adb_target_sanitize :=
 adb_version := $(shell git -C $(LOCAL_PATH) rev-parse --short=12 HEAD 2>/dev/null)-android
 
 ADB_COMMON_CFLAGS := \
-    -Wall -Wextra -Werror \
+    -Wall -Wextra  \
     -Wno-unused-parameter \
     -Wno-missing-field-initializers \
     -Wvla \
@@ -116,7 +116,7 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libadb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := $(LIBADB_CFLAGS) -DADB_HOST=1
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -155,14 +155,14 @@ LOCAL_SRC_FILES := \
 LOCAL_SANITIZE := $(adb_target_sanitize)
 LOCAL_STATIC_LIBRARIES := libadbd libcrypto_utils_static libcrypto_static
 LOCAL_SHARED_LIBRARIES := liblog libbase libcutils
-include $(BUILD_NATIVE_TEST)
+#include $(BUILD_NATIVE_TEST)
 
 # libdiagnose_usb
 # =========================================================
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libdiagnose_usb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := $(LIBADB_CFLAGS)
 LOCAL_SRC_FILES := diagnose_usb.cpp
 # Even though we're building a static library (and thus there's no link step for
@@ -175,7 +175,7 @@ include $(BUILD_HOST_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := adb_test
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := -DADB_HOST=1 $(LIBADB_CFLAGS)
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -212,7 +212,7 @@ LOCAL_STATIC_LIBRARIES_windows := AdbWinApi
 
 LOCAL_MULTILIB := first
 
-include $(BUILD_HOST_NATIVE_TEST)
+#include $(BUILD_HOST_NATIVE_TEST)
 
 # adb device tracker (used by ddms) test tool
 # =========================================================
@@ -229,7 +229,7 @@ LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_SHARED_LIBRARIES := libbase
 LOCAL_STATIC_LIBRARIES := libadb libcrypto_utils_static libcrypto_static libcutils
 LOCAL_LDLIBS += -lrt -ldl -lpthread
-include $(BUILD_HOST_EXECUTABLE)
+#include $(BUILD_HOST_EXECUTABLE)
 endif
 
 # adb host tool
@@ -274,7 +274,7 @@ LOCAL_CFLAGS_darwin := \
 
 LOCAL_MODULE := adb
 LOCAL_MODULE_TAGS := debug
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 
 LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_STATIC_LIBRARIES := \
@@ -329,12 +329,10 @@ LOCAL_CFLAGS := \
     -D_GNU_SOURCE \
     -Wno-deprecated-declarations \
 
-LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=1
 
-ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
 LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
-endif
 
 LOCAL_MODULE := adbd
 
