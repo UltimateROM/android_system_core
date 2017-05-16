@@ -116,7 +116,6 @@ LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_UNSTRIPPED)
 
 LOCAL_STATIC_LIBRARIES := \
     libinit \
-    libbootloader_message \
     libfs_mgr \
     libfec \
     libfec_rs \

@@ -48,7 +48,6 @@
 #include <android-base/file.h>
 #include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
-#include <bootloader_message/bootloader_message.h>
 #include <cutils/partition_utils.h>
 #include <cutils/android_reboot.h>
 #include <logwrap/logwrap.h>
@@ -159,10 +158,6 @@ static void turnOffBacklight() {
 static int wipe_data_via_recovery(const std::string& reason) {
     const std::vector<std::string> options = {"--wipe_data", std::string() + "--reason=" + reason};
     std::string err;
-    if (!write_bootloader_message(options, &err)) {
-        ERROR("failed to set bootloader message: %s", err.c_str());
-        return -1;
-    }
     android_reboot(ANDROID_RB_RESTART2, 0, "recovery");
     while (1) { pause(); }  // never reached
 }
