@@ -30,7 +30,6 @@
 #include "fs_mgr.h"
 #include "fs_mgr_priv.h"
 
-#include "bootloader.h"
 
 // Copies slot_suffix from misc into |out_suffix|. Returns 0 on
 // success, -1 on error or if there is no non-empty slot_suffix.
@@ -38,43 +37,6 @@ static int get_active_slot_suffix_from_misc(struct fstab *fstab,
                                             char *out_suffix,
                                             size_t suffix_len)
 {
-    int n;
-    int misc_fd;
-    ssize_t num_read;
-    struct bootloader_message msg;
-
-    misc_fd = -1;
-    for (n = 0; n < fstab->num_entries; n++) {
-        if (strcmp(fstab->recs[n].mount_point, "/misc") == 0) {
-            misc_fd = open(fstab->recs[n].blk_device, O_RDONLY);
-            if (misc_fd == -1) {
-                ERROR("Error opening misc partition \"%s\" (%s)\n",
-                      fstab->recs[n].blk_device,
-                      strerror(errno));
-                return -1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    if (misc_fd == -1) {
-        ERROR("Error finding misc partition\n");
-        return -1;
-    }
-
-    num_read = TEMP_FAILURE_RETRY(read(misc_fd, &msg, sizeof(msg)));
-    // Linux will never return partial reads when reading from block
-    // devices so no need to worry about them.
-    if (num_read != sizeof(msg)) {
-        ERROR("Error reading bootloader_message (%s)\n", strerror(errno));
-        close(misc_fd);
-        return -1;
-    }
-    close(misc_fd);
-    if (msg.slot_suffix[0] == '\0')
-        return -1;
-    strncpy(out_suffix, msg.slot_suffix, suffix_len);
     return 0;
 }
 

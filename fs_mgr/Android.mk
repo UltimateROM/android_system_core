@@ -35,7 +35,7 @@ LOCAL_MODULE:= libfs_mgr
 LOCAL_STATIC_LIBRARIES := $(common_static_libraries)
 LOCAL_C_INCLUDES += system/extras/ext4_utils system/extras/squashfs_utils external/e2fsprogs/lib
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
-LOCAL_CFLAGS := -Werror
+LOCAL_CFLAGS := -DFS_MGR
 ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
 LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
 endif
