@@ -49,25 +49,8 @@
 //    batteryTemperaturePath: battery temperature (POWER_SUPPLY_PROP_TEMP)
 //    batteryTechnologyPath: battery technology (POWER_SUPPLY_PROP_TECHNOLOGY)
 //    batteryCurrentNowPath: battery current (POWER_SUPPLY_PROP_CURRENT_NOW)
-//    batteryCurrentAvgPath: battery average (POWER_SUPPLY_PROP_CURRENT_AVG)
 //    batteryChargeCounterPath: battery accumulated charge
 //                                         (POWER_SUPPLY_PROP_CHARGE_COUNTER)
-//
-//    dockBatteryStatusPath: dock charging status (POWER_SUPPLY_PROP_STATUS)
-//    dockBatteryHealthPath: dock battery health (POWER_SUPPLY_PROP_HEALTH)
-//    dockBatteryPresentPath: dock battery present (POWER_SUPPLY_PROP_PRESENT)
-//    dockBatteryCapacityPath: remaining dock capacity (POWER_SUPPLY_PROP_CAPACITY)
-//    dockBatteryVoltagePath: dock battery voltage (POWER_SUPPLY_PROP_VOLTAGE_NOW)
-//    dockBatteryTemperaturePath: dock battery temperature (POWER_SUPPLY_PROP_TEMP)
-//    dockBatteryTechnologyPath: dock battery technology (POWER_SUPPLY_PROP_TECHNOLOGY)
-//    dockBatteryCurrentNowPath: dock battery current (POWER_SUPPLY_PROP_CURRENT_NOW)
-//    dockBatteryCurrentAvgPath: dock battery average (POWER_SUPPLY_PROP_CURRENT_AVG)
-//    dockBatteryChargeCounterPath: dock battery accumulated charge
-//                                         (POWER_SUPPLY_PROP_CHARGE_COUNTER)
-//
-// The dockBatterySupported property indicates whether a dock battery is supported
-// by the device, and whether this module should fetch dock battery values.
-// Defaults is to false.
 
 struct healthd_config {
     int periodic_chores_interval_fast;
@@ -89,20 +72,6 @@ struct healthd_config {
     int (*energyCounter)(int64_t *);
     int boot_min_cap;
     bool (*screen_on)(android::BatteryProperties *props);
-
-    bool dockBatterySupported;
-    android::String8 dockBatteryStatusPath;
-    android::String8 dockBatteryHealthPath;
-    android::String8 dockBatteryPresentPath;
-    android::String8 dockBatteryCapacityPath;
-    android::String8 dockBatteryVoltagePath;
-    android::String8 dockBatteryTemperaturePath;
-    android::String8 dockBatteryTechnologyPath;
-    android::String8 dockBatteryCurrentNowPath;
-    android::String8 dockBatteryCurrentAvgPath;
-    android::String8 dockBatteryChargeCounterPath;
-
-    int (*dockEnergyCounter)(int64_t *);
 };
 
 enum EventWakeup {
@@ -161,21 +130,5 @@ void healthd_board_init(struct healthd_config *config);
 // is to be logged, or non-zero to prevent logging this information.
 
 int healthd_board_battery_update(struct android::BatteryProperties *props);
-
-//This API is called to turn on/off the display backlight incase it can't be
-//handle correcty in the display driver by calling gr_fg_blank();
-void healthd_board_mode_charger_set_backlight(bool en);
-
-//This API is called to update the battery/charging status by using the user
-//noticeable method other then the animation, such as: LEDs
-void healthd_board_mode_charger_battery_update(struct android::BatteryProperties *batt_prop);
-
-//This API is used to handle some board specific charger mode initialization,
-//such as: checking the charging is enabled or not.
-void healthd_board_mode_charger_init(void);
-
-//This API is called in the draw_battery() function to draw more infomation
-//about the battery on the animation, such as the SoC (State of Charge).
-void healthd_board_mode_charger_draw_battery(struct android::BatteryProperties *batt_prop);
 
 #endif /* _HEALTHD_H_ */

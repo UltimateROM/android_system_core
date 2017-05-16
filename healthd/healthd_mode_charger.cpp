@@ -30,9 +30,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <android-base/file.h>
-#include <android-base/stringprintf.h>
-
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
@@ -47,13 +44,9 @@
 #include <suspend/autosuspend.h>
 #endif
 
-#include "animation.h"
-#include "AnimationParser.h"
 #include "minui/minui.h"
 
 #include <healthd/healthd.h>
-
-using namespace android;
 
 char *locale;
 
@@ -72,35 +65,44 @@ char *locale;
 
 #define BATTERY_UNKNOWN_TIME    (2 * MSEC_PER_SEC)
 #define POWER_ON_KEY_TIME       (2 * MSEC_PER_SEC)
-#define UNPLUGGED_SHUTDOWN_TIME (5 * MSEC_PER_SEC)
+#define UNPLUGGED_SHUTDOWN_TIME (10 * MSEC_PER_SEC)
+
+#define BATTERY_FULL_THRESH     95
 
 #define LAST_KMSG_PATH          "/proc/last_kmsg"
 #define LAST_KMSG_PSTORE_PATH   "/sys/fs/pstore/console-ramoops"
 #define LAST_KMSG_MAX_SZ        (32 * 1024)
-#ifndef RED_LED_PATH
-#define RED_LED_PATH            "/sys/class/leds/red/brightness"
-#endif
-#ifndef GREEN_LED_PATH
-#define GREEN_LED_PATH          "/sys/class/leds/green/brightness"
-#endif
-#ifndef BLUE_LED_PATH
-#define BLUE_LED_PATH           "/sys/class/leds/blue/brightness"
-#endif
-
-#ifndef BLINK_PATH
-#define BLINK_PATH              "/sys/class/leds/red/device/blink"
-#endif
 
 #define LOGE(x...) do { KLOG_ERROR("charger", x); } while (0)
 #define LOGW(x...) do { KLOG_WARNING("charger", x); } while (0)
 #define LOGV(x...) do { KLOG_DEBUG("charger", x); } while (0)
 
-static constexpr const char* animation_desc_path = "/res/values/charger/animation.txt";
-
 struct key_state {
     bool pending;
     bool down;
     int64_t timestamp;
+};
+
+struct frame {
+    int disp_time;
+    int min_capacity;
+    bool level_only;
+
+    GRSurface* surface;
+};
+
+struct animation {
+    bool run;
+
+    struct frame *frames;
+    int cur_frame;
+    int num_frames;
+
+    int cur_cycle;
+    int num_cycles;
+
+    /* current capacity being animated */
+    int capacity;
 };
 
 struct charger {
@@ -117,83 +119,66 @@ struct charger {
     int boot_min_cap;
 };
 
-static const struct animation BASE_ANIMATION = {
-    .text_clock = {
-        .pos_x = 0,
-        .pos_y = 0,
-
-        .color_r = 255,
-        .color_g = 255,
-        .color_b = 255,
-        .color_a = 255,
-
-        .font = nullptr,
+static struct frame batt_anim_frames[] = {
+    {
+        .disp_time = 750,
+        .min_capacity = 0,
+        .level_only = false,
+        .surface = NULL,
     },
-    .text_percent = {
-        .pos_x = 0,
-        .pos_y = 0,
-
-        .color_r = 255,
-        .color_g = 255,
-        .color_b = 255,
-        .color_a = 255,
+    {
+        .disp_time = 750,
+        .min_capacity = 20,
+        .level_only = false,
+        .surface = NULL,
     },
+    {
+        .disp_time = 750,
+        .min_capacity = 40,
+        .level_only = false,
+        .surface = NULL,
+    },
+    {
+        .disp_time = 750,
+        .min_capacity = 60,
+        .level_only = false,
+        .surface = NULL,
+    },
+    {
+        .disp_time = 750,
+        .min_capacity = 80,
+        .level_only = true,
+        .surface = NULL,
+    },
+    {
+        .disp_time = 750,
+        .min_capacity = BATTERY_FULL_THRESH,
+        .level_only = false,
+        .surface = NULL,
+    },
+};
 
+static struct animation battery_animation = {
     .run = false,
-
-    .frames = nullptr,
+    .frames = batt_anim_frames,
     .cur_frame = 0,
-    .num_frames = 0,
-    .first_frame_repeats = 2,
-
+    .num_frames = ARRAY_SIZE(batt_anim_frames),
     .cur_cycle = 0,
     .num_cycles = 3,
-
-    .cur_level = 0,
-    .cur_status = BATTERY_STATUS_UNKNOWN,
+    .capacity = 0,
 };
 
+#ifdef HEALTHD_ENABLE_TRICOLOR_LED
 
-static struct animation::frame default_animation_frames[] = {
-    {
-        .disp_time = 750,
-        .min_level = 0,
-        .max_level = 19,
-        .surface = NULL,
-    },
-    {
-        .disp_time = 750,
-        .min_level = 0,
-        .max_level = 39,
-        .surface = NULL,
-    },
-    {
-        .disp_time = 750,
-        .min_level = 0,
-        .max_level = 59,
-        .surface = NULL,
-    },
-    {
-        .disp_time = 750,
-        .min_level = 0,
-        .max_level = 79,
-        .surface = NULL,
-    },
-    {
-        .disp_time = 750,
-        .min_level = 80,
-        .max_level = 95,
-        .surface = NULL,
-    },
-    {
-        .disp_time = 750,
-        .min_level = 0,
-        .max_level = 100,
-        .surface = NULL,
-    },
-};
-
-static struct animation battery_animation = BASE_ANIMATION;
+#ifndef RED_LED_PATH
+#define RED_LED_PATH     "/sys/class/leds/red/brightness"
+#endif
+#ifndef GREEN_LED_PATH
+#define GREEN_LED_PATH   "/sys/class/leds/green/brightness"
+#endif
+#ifndef BLUE_LED_PATH
+#define BLUE_LED_PATH    "/sys/class/leds/blue/brightness"
+#endif
 
 enum {
     RED_LED = 0x01 << 0,
@@ -201,7 +186,6 @@ enum {
     BLUE_LED = 0x01 << 2,
 };
 
-#ifndef NO_CHARGER_LED
 struct led_ctl {
     int color;
     const char *path;
@@ -231,27 +215,7 @@ static int char_width;
 static int char_height;
 static bool minui_inited;
 
-#ifndef NO_CHARGER_LED
-static int set_blink(int val)
-{
-    int fd;
-    char buffer[10];
-
-    fd = open(BLINK_PATH, O_RDWR);
-    if (fd < 0) {
-        LOGE("Could not open blink file\n");
-        return -1;
-    }
-    snprintf(buffer, sizeof(buffer), "%d\n", val);
-    if (write(fd, buffer, strlen(buffer)) < 0) {
-        LOGE("Could not write to blink file\n");
-        close(fd);
-        return -1;
-    }
-    close(fd);
-    return 0;
-}
-
+#ifdef HEALTHD_ENABLE_TRICOLOR_LED
 static int set_tricolor_led(int on, int color)
 {
     int fd, i;
@@ -271,8 +235,7 @@ static int set_tricolor_led(int on, int color)
 
             if (write(fd, buffer, strlen(buffer)) < 0)
                 LOGE("Could not write to led node\n");
-            if (fd >= 0)
-                close(fd);
+            close(fd);
         }
     }
 
@@ -296,12 +259,57 @@ static int set_battery_soc_leds(int soc)
         LOGV("soc = %d, set led color 0x%x\n", soc, soc_leds[i].color);
     }
 
-    /* This is required to commit the changes to hardware */
-    set_blink(0);
-
     return 0;
 }
 #endif
+
+#ifdef HEALTHD_FORCE_BACKLIGHT_CONTROL
+
+#ifndef HEALTHD_BACKLIGHT_ON_LEVEL
+#define HEALTHD_BACKLIGHT_ON_LEVEL  150
+#endif
+
+static int set_backlight(bool on)
+{
+    int fd;
+    char buffer[10];
+
+    if (access(TW_BRIGHTNESS_PATH, R_OK | W_OK) != 0) {
+        LOGW("Backlight control not support\n");
+        return 0;
+    }
+
+    memset(buffer, '\0', sizeof(buffer));
+    fd = open(TW_BRIGHTNESS_PATH, O_RDWR);
+    if (fd < 0) {
+        LOGE("Could not open backlight node : %s\n", strerror(errno));
+        return 0;
+    }
+    LOGV("Enabling backlight\n");
+    snprintf(buffer, sizeof(buffer), "%d\n", on ? HEALTHD_BACKLIGHT_ON_LEVEL : 0);
+    if (write(fd, buffer,strlen(buffer)) < 0) {
+        LOGE("Could not write to backlight node : %s\n", strerror(errno));
+    }
+    close(fd);
+
+#ifdef TW_SECONDARY_BRIGHTNESS_PATH
+    if (access(TW_SECONDARY_BRIGHTNESS_PATH, R_OK | W_OK) != 0) {
+        LOGW("Secondary backlight control not support\n");
+    } else {
+        fd = open(TW_SECONDARY_BRIGHTNESS_PATH, O_RDWR);
+        if (fd < 0) {
+            LOGW("Could not open secondary backlight node : %s\n", strerror(errno));
+        } else {
+        LOGV("Enabling secondary backlight\n");
+        if (write(fd, buffer,strlen(buffer)) < 0)
+            LOGE("Could not write to secondary backlight node : %s\n", strerror(errno));
+        }
+        close(fd);
+    }
+#endif // TW_SECONDARY_BRIGHTNESS_PATH
+    return 0;
+}
+#endif // HEALTHD_FORCE_BACKLIGHT_CONTROL
 
 /* current time in milliseconds */
 static int64_t curr_time_ms(void)
@@ -385,100 +393,24 @@ static int request_suspend(bool /*enable*/)
 
 static int draw_text(const char *str, int x, int y)
 {
-    int str_len_px = gr_measure(gr_sys_font(), str);
+    int str_len_px = gr_measure(str);
 
     if (x < 0)
         x = (gr_fb_width() - str_len_px) / 2;
     if (y < 0)
         y = (gr_fb_height() - char_height) / 2;
-    gr_text(gr_sys_font(), x, y, str, 0);
+    gr_text(x, y, str, 0);
 
     return y + char_height;
 }
 
-static void android_green(void)
+static void android_white(void)
 {
-    gr_color(0xa4, 0xc6, 0x39, 255);
-}
-
-// Negative x or y coordinates position the text away from the opposite edge that positive ones do.
-void determine_xy(const animation::text_field& field, const int length, int* x, int* y)
-{
-    *x = field.pos_x;
-    *y = field.pos_y;
-
-    int str_len_px = length * field.font->char_width;
-    if (field.pos_x == CENTER_VAL) {
-        *x = (gr_fb_width() - str_len_px) / 2;
-    } else if (field.pos_x >= 0) {
-        *x = field.pos_x;
-    } else {  // position from max edge
-        *x = gr_fb_width() + field.pos_x - str_len_px;
-    }
-
-    if (field.pos_y == CENTER_VAL) {
-        *y = (gr_fb_height() - field.font->char_height) / 2;
-    } else if (field.pos_y >= 0) {
-        *y = field.pos_y;
-    } else {  // position from max edge
-        *y = gr_fb_height() + field.pos_y - field.font->char_height;
-    }
-}
-
-static void draw_clock(const animation& anim)
-{
-    static constexpr char CLOCK_FORMAT[] = "%H:%M";
-    static constexpr int CLOCK_LENGTH = 6;
-
-    const animation::text_field& field = anim.text_clock;
-
-    if (field.font == nullptr || field.font->char_width == 0 || field.font->char_height == 0) return;
-
-    time_t rawtime;
-    time(&rawtime);
-    struct tm* time_info = localtime(&rawtime);
-
-    char clock_str[CLOCK_LENGTH];
-    size_t length = strftime(clock_str, CLOCK_LENGTH, CLOCK_FORMAT, time_info);
-    if (length != CLOCK_LENGTH - 1) {
-        LOGE("Could not format time\n");
-        return;
-    }
-
-    int x, y;
-    determine_xy(field, length, &x, &y);
-
-    LOGV("drawing clock %s %d %d\n", clock_str, x, y);
-    gr_color(field.color_r, field.color_g, field.color_b, field.color_a);
-    gr_text(field.font, x, y, clock_str, false);
-}
-
-static void draw_percent(const animation& anim)
-{
-    int cur_level = anim.cur_level;
-    if (anim.cur_status == BATTERY_STATUS_FULL) {
-        cur_level = 100;
-    }
-
-    if (cur_level <= 0) return;
-
-    const animation::text_field& field = anim.text_percent;
-    if (field.font == nullptr || field.font->char_width == 0 || field.font->char_height == 0) {
-        return;
-    }
-
-    std::string str = base::StringPrintf("%d%%", cur_level);
-
-    int x, y;
-    determine_xy(field, str.size(), &x, &y);
-
-    LOGV("drawing percent %s %d %d\n", str.c_str(), x, y);
-    gr_color(field.color_r, field.color_g, field.color_b, field.color_a);
-    gr_text(field.font, x, y, str.c_str(), false);
+    gr_color(255, 255, 255, 255);
 }
 
 /* returns the last y-offset of where the surface ends */
-static int draw_surface_centered(GRSurface* surface)
+static int draw_surface_centered(struct charger* /*charger*/, GRSurface* surface)
 {
     int w;
     int h;
@@ -499,28 +431,49 @@ static void draw_unknown(struct charger *charger)
 {
     int y;
     if (charger->surf_unknown) {
-        draw_surface_centered(charger->surf_unknown);
+        draw_surface_centered(charger, charger->surf_unknown);
     } else {
-        android_green();
+        android_white();
         y = draw_text("Charging!", -1, -1);
         draw_text("?\?/100", -1, y + 25);
     }
 }
 
-static void draw_battery(const struct charger* charger)
+static void draw_battery(struct charger *charger)
 {
-    const struct animation& anim = *charger->batt_anim;
-    const struct animation::frame& frame = anim.frames[anim.cur_frame];
+    struct animation *batt_anim = charger->batt_anim;
+    struct frame *frame = &batt_anim->frames[batt_anim->cur_frame];
 
-    if (anim.num_frames != 0) {
-        draw_surface_centered(frame.surface);
+    if (batt_anim->num_frames != 0) {
+        draw_surface_centered(charger, frame->surface);
         LOGV("drawing frame #%d min_cap=%d time=%d\n",
-             anim.cur_frame, frame.min_level,
-             frame.disp_time);
+             batt_anim->cur_frame, frame->min_capacity,
+             frame->disp_time);
     }
-    draw_clock(anim);
-    draw_percent(anim);
-    healthd_board_mode_charger_draw_battery(batt_prop);
+}
+
+#define STR_LEN    64
+static void draw_capacity(struct charger *charger)
+{
+    char cap_str[STR_LEN];
+    int x, y;
+    int str_len_px;
+    int batt_height = 0;
+    // get height of battery image to draw text below
+    struct animation *batt_anim = charger->batt_anim;
+    struct frame *frame = &batt_anim->frames[batt_anim->cur_frame];
+    if (batt_anim->num_frames != 0) {
+        // nothing else should happen actually
+        batt_height = gr_get_height(frame->surface);
+    }
+
+    snprintf(cap_str, (STR_LEN - 1), "%d%%", charger->batt_anim->capacity);
+    str_len_px = gr_measure(cap_str);
+    x = (gr_fb_width() - str_len_px) / 2;
+    // draw it below the battery image
+    y = (gr_fb_height() + batt_height) / 2 + char_height * 2;
+    android_white();
+    gr_text(x, y, cap_str, 0);
 }
 
 static void redraw_screen(struct charger *charger)
@@ -530,10 +483,12 @@ static void redraw_screen(struct charger *charger)
     clear_screen();
 
     /* try to display *something* */
-    if (batt_anim->cur_level < 0 || batt_anim->num_frames == 0)
+    if (batt_anim->capacity < 0 || batt_anim->num_frames == 0) {
         draw_unknown(charger);
-    else
+    } else {
         draw_battery(charger);
+        draw_capacity(charger);
+    }
     gr_flip();
 }
 
@@ -549,33 +504,16 @@ static void reset_animation(struct animation *anim)
     anim->run = false;
 }
 
-static void init_status_display(struct animation* anim)
-{
-    int res;
-
-    if (!anim->text_clock.font_file.empty()) {
-        if ((res =
-                gr_init_font(anim->text_clock.font_file.c_str(), &anim->text_clock.font)) < 0) {
-            LOGE("Could not load time font (%d)\n", res);
-        }
-    }
-
-    if (!anim->text_percent.font_file.empty()) {
-        if ((res =
-                gr_init_font(anim->text_percent.font_file.c_str(), &anim->text_percent.font)) < 0) {
-            LOGE("Could not load percent font (%d)\n", res);
-        }
-    }
-}
-
 static void update_screen_state(struct charger *charger, int64_t now)
 {
     struct animation *batt_anim = charger->batt_anim;
     int disp_time;
 
-    if (!batt_anim->run || now < charger->next_screen_transition) return;
+    if (!batt_anim->run || now < charger->next_screen_transition)
+        return;
 
     if (!minui_inited) {
+
         if (healthd_config && healthd_config->screen_on) {
             if (!healthd_config->screen_on(batt_prop)) {
                 LOGV("[%" PRId64 "] leave screen off\n", now);
@@ -588,21 +526,21 @@ static void update_screen_state(struct charger *charger, int64_t now)
         }
 
         gr_init();
-        gr_font_size(gr_sys_font(), &char_width, &char_height);
-        init_status_display(batt_anim);
+        gr_font_size(&char_width, &char_height);
 
 #ifndef CHARGER_DISABLE_INIT_BLANK
-        healthd_board_mode_charger_set_backlight(false);
         gr_fb_blank(true);
 #endif
         minui_inited = true;
     }
 
     /* animation is over, blank screen and leave */
-    if (batt_anim->num_cycles > 0 && batt_anim->cur_cycle == batt_anim->num_cycles) {
+    if (batt_anim->cur_cycle == batt_anim->num_cycles) {
         reset_animation(batt_anim);
         charger->next_screen_transition = -1;
-        healthd_board_mode_charger_set_backlight(false);
+#ifdef HEALTHD_FORCE_BACKLIGHT_CONTROL
+        set_backlight(false);
+#endif
         gr_fb_blank(true);
         LOGV("[%" PRId64 "] animation done\n", now);
         if (charger->charger_connected)
@@ -616,30 +554,29 @@ static void update_screen_state(struct charger *charger, int64_t now)
     if (batt_anim->cur_frame == 0) {
 
         LOGV("[%" PRId64 "] animation starting\n", now);
-        if (batt_prop) {
-            batt_anim->cur_level = batt_prop->batteryLevel;
-            batt_anim->cur_status = batt_prop->batteryStatus;
-            if (batt_prop->batteryLevel >= 0 && batt_anim->num_frames != 0) {
-                /* find first frame given current battery level */
-                for (int i = 0; i < batt_anim->num_frames; i++) {
-                    if (batt_anim->cur_level >= batt_anim->frames[i].min_level &&
-                        batt_anim->cur_level <= batt_anim->frames[i].max_level) {
-                        batt_anim->cur_frame = i;
-                        break;
-                    }
-                }
+        if (batt_prop && batt_prop->batteryLevel >= 0 && batt_anim->num_frames != 0) {
+            int i;
 
-                // repeat the first frame first_frame_repeats times
-                disp_time = batt_anim->frames[batt_anim->cur_frame].disp_time *
-                    batt_anim->first_frame_repeats;
+            /* find first frame given current capacity */
+            for (i = 1; i < batt_anim->num_frames; i++) {
+                if (batt_prop->batteryLevel < batt_anim->frames[i].min_capacity)
+                    break;
             }
+            batt_anim->cur_frame = i - 1;
+
+            /* show the first frame for twice as long */
+            disp_time = batt_anim->frames[batt_anim->cur_frame].disp_time * 2;
         }
+        if (batt_prop)
+            batt_anim->capacity = batt_prop->batteryLevel;
     }
 
     /* unblank the screen on first cycle */
     if (batt_anim->cur_cycle == 0) {
         gr_fb_blank(false);
-        healthd_board_mode_charger_set_backlight(true);
+#ifdef HEALTHD_FORCE_BACKLIGHT_CONTROL
+        set_backlight(true);
+#endif
     }
 
     /* draw the new frame (@ cur_frame) */
@@ -648,8 +585,8 @@ static void update_screen_state(struct charger *charger, int64_t now)
     /* if we don't have anim frames, we only have one image, so just bump
      * the cycle counter and exit
      */
-    if (batt_anim->num_frames == 0 || batt_anim->cur_level < 0) {
-        LOGW("[%" PRId64 "] animation missing or unknown battery status\n", now);
+    if (batt_anim->num_frames == 0 || batt_anim->capacity < 0) {
+        LOGV("[%" PRId64 "] animation missing or unknown battery status\n", now);
         charger->next_screen_transition = now + BATTERY_UNKNOWN_TIME;
         batt_anim->cur_cycle++;
         return;
@@ -664,11 +601,12 @@ static void update_screen_state(struct charger *charger, int64_t now)
     if (charger->charger_connected) {
         batt_anim->cur_frame++;
 
+        /* if the frame is used for level-only, that is only show it when it's
+         * the current level, skip it during the animation.
+         */
         while (batt_anim->cur_frame < batt_anim->num_frames &&
-               (batt_anim->cur_level < batt_anim->frames[batt_anim->cur_frame].min_level ||
-                batt_anim->cur_level > batt_anim->frames[batt_anim->cur_frame].max_level)) {
+               batt_anim->frames[batt_anim->cur_frame].level_only)
             batt_anim->cur_frame++;
-        }
         if (batt_anim->cur_frame >= batt_anim->num_frames) {
             batt_anim->cur_cycle++;
             batt_anim->cur_frame = 0;
@@ -751,10 +689,9 @@ static void process_key(struct charger *charger, int code, int64_t now)
                    accordingly. */
                 if (property_get_bool("ro.enable_boot_charger_mode", false)) {
                     LOGW("[%" PRId64 "] booting from charger mode\n", now);
-                    healthd_board_mode_charger_set_backlight(false);
                     property_set("sys.boot_from_charger_mode", "1");
                 } else {
-                    if (charger->batt_anim->cur_level >= charger->boot_min_cap) {
+                    if (charger->batt_anim->capacity >= charger->boot_min_cap) {
                         LOGW("[%" PRId64 "] rebooting\n", now);
                         android_reboot(ANDROID_RB_RESTART, 0, 0);
                     } else {
@@ -775,23 +712,20 @@ static void process_key(struct charger *charger, int code, int64_t now)
                  * the animation is running, turn off the animation and request
                  * suspend.
                  */
-                if (!batt_anim->run) {
+                if (!charger->batt_anim->run) {
                     kick_animation(batt_anim);
                     request_suspend(false);
                 } else {
                     reset_animation(batt_anim);
                     charger->next_screen_transition = -1;
-                    healthd_board_mode_charger_set_backlight(false);
+#ifdef HEALTHD_FORCE_BACKLIGHT_CONTROL
+                    set_backlight(false);
+#endif
                     gr_fb_blank(true);
                     if (charger->charger_connected)
                         request_suspend(true);
                 }
             }
-        }
-    } else {
-        if (key->pending) {
-            request_suspend(false);
-            kick_animation(charger->batt_anim);
         }
     }
 
@@ -801,7 +735,6 @@ static void process_key(struct charger *charger, int code, int64_t now)
 static void handle_input_state(struct charger *charger, int64_t now)
 {
     process_key(charger, KEY_POWER, now);
-    process_key(charger, KEY_HOME, now);
 
     if (charger->next_key_check != -1 && now > charger->next_key_check)
         charger->next_key_check = -1;
@@ -809,7 +742,7 @@ static void handle_input_state(struct charger *charger, int64_t now)
 
 static void handle_power_supply_state(struct charger *charger, int64_t now)
 {
-#ifndef NO_CHARGER_LED
+#ifdef HEALTHD_ENABLE_TRICOLOR_LED
     static int old_soc = 0;
     int soc = 0;
 #endif
@@ -817,9 +750,7 @@ static void handle_power_supply_state(struct charger *charger, int64_t now)
     if (!charger->have_battery_state)
         return;
 
-    healthd_board_mode_charger_battery_update(batt_prop);
-
-#ifndef NO_CHARGER_LED
+#ifdef HEALTHD_ENABLE_TRICOLOR_LED
     if (batt_prop && batt_prop->batteryLevel >= 0) {
         soc = batt_prop->batteryLevel;
     }
@@ -937,52 +868,6 @@ static void charger_event_handler(uint32_t /*epevents*/)
         ev_dispatch();
 }
 
-animation* init_animation()
-{
-    bool parse_success;
-
-    std::string content;
-    if (base::ReadFileToString(animation_desc_path, &content)) {
-        parse_success = parse_animation_desc(content, &battery_animation);
-    } else {
-        LOGW("Could not open animation description at %s\n", animation_desc_path);
-        parse_success = false;
-    }
-
-    if (!parse_success) {
-        LOGW("Could not parse animation description. Using default animation.\n");
-        battery_animation = BASE_ANIMATION;
-        battery_animation.animation_file.assign("charger/battery_scale");
-        battery_animation.frames = default_animation_frames;
-        battery_animation.num_frames = ARRAY_SIZE(default_animation_frames);
-    }
-    if (battery_animation.fail_file.empty()) {
-        battery_animation.fail_file.assign("charger/battery_fail");
-    }
-
-    LOGV("Animation Description:\n");
-    LOGV("  animation: %d %d '%s' (%d)\n",
-        battery_animation.num_cycles, battery_animation.first_frame_repeats,
-        battery_animation.animation_file.c_str(), battery_animation.num_frames);
-    LOGV("  fail_file: '%s'\n", battery_animation.fail_file.c_str());
-    LOGV("  clock: %d %d %d %d %d %d '%s'\n",
-        battery_animation.text_clock.pos_x, battery_animation.text_clock.pos_y,
-        battery_animation.text_clock.color_r, battery_animation.text_clock.color_g,
-        battery_animation.text_clock.color_b, battery_animation.text_clock.color_a,
-        battery_animation.text_clock.font_file.c_str());
-    LOGV("  percent: %d %d %d %d %d %d '%s'\n",
-        battery_animation.text_percent.pos_x, battery_animation.text_percent.pos_y,
-        battery_animation.text_percent.color_r, battery_animation.text_percent.color_g,
-        battery_animation.text_percent.color_b, battery_animation.text_percent.color_a,
-        battery_animation.text_percent.font_file.c_str());
-    for (int i = 0; i < battery_animation.num_frames; i++) {
-        LOGV("  frame %.2d: %d %d %d\n", i, battery_animation.frames[i].disp_time,
-            battery_animation.frames[i].min_level, battery_animation.frames[i].max_level);
-    }
-
-    return &battery_animation;
-}
-
 void healthd_mode_charger_init(struct healthd_config* config)
 {
     int ret;
@@ -994,47 +879,41 @@ void healthd_mode_charger_init(struct healthd_config* config)
 
     LOGW("--------------- STARTING CHARGER MODE ---------------\n");
 
-    healthd_board_mode_charger_init();
-
     ret = ev_init(input_callback, charger);
     if (!ret) {
         epollfd = ev_get_epollfd();
-        healthd_register_event(epollfd, charger_event_handler, EVENT_WAKEUP_FD);
+        healthd_register_event(epollfd, charger_event_handler);
     }
 
-    struct animation* anim = init_animation();
-    charger->batt_anim = anim;
-
-    ret = res_create_display_surface(anim->fail_file.c_str(), &charger->surf_unknown);
+    ret = res_create_display_surface("charger/battery_fail", &charger->surf_unknown);
     if (ret < 0) {
-        LOGE("Cannot load custom battery_fail image. Reverting to built in.\n");
-        ret = res_create_display_surface("charger/battery_fail", &charger->surf_unknown);
-        if (ret < 0) {
-            LOGE("Cannot load built in battery_fail image\n");
-            charger->surf_unknown = NULL;
-        }
+        LOGE("Cannot load battery_fail image\n");
+        charger->surf_unknown = NULL;
     }
+
+    charger->batt_anim = &battery_animation;
 
     GRSurface** scale_frames;
     int scale_count;
     int scale_fps;  // Not in use (charger/battery_scale doesn't have FPS text
                     // chunk). We are using hard-coded frame.disp_time instead.
-    ret = res_create_multi_display_surface(anim->animation_file.c_str(),
-        &scale_count, &scale_fps, &scale_frames);
+    ret = res_create_multi_display_surface("charger/battery_scale", &scale_count, &scale_fps,
+                                           &scale_frames);
     if (ret < 0) {
         LOGE("Cannot load battery_scale image\n");
-        anim->num_frames = 0;
-        anim->num_cycles = 1;
-    } else if (scale_count != anim->num_frames) {
+        charger->batt_anim->num_frames = 0;
+        charger->batt_anim->num_cycles = 1;
+    } else if (scale_count != charger->batt_anim->num_frames) {
         LOGE("battery_scale image has unexpected frame count (%d, expected %d)\n",
-             scale_count, anim->num_frames);
-        anim->num_frames = 0;
-        anim->num_cycles = 1;
+             scale_count, charger->batt_anim->num_frames);
+        charger->batt_anim->num_frames = 0;
+        charger->batt_anim->num_cycles = 1;
     } else {
-        for (i = 0; i < anim->num_frames; i++) {
-            anim->frames[i].surface = scale_frames[i];
+        for (i = 0; i < charger->batt_anim->num_frames; i++) {
+            charger->batt_anim->frames[i].surface = scale_frames[i];
         }
     }
+
     ev_sync_key_state(set_key_callback, charger);
 
     charger->next_screen_transition = -1;
