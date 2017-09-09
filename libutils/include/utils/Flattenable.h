@@ -64,22 +64,32 @@ public:
     template<typename T>
     static void write(void*& buffer, size_t& size, const T& value) {
 /*
+	(int**)buffer;
+	(void*)size;
+	(void*)value;
+*/
+/*
         static_assert(std::is_trivially_copyable<T>::value,
                       "Cannot flatten a non-trivially-copyable type");
+*/
         memcpy(buffer, &value, sizeof(T));
         advance(buffer, size, sizeof(T));
-*/
     }
 
     // read a POD structure
     template<typename T>
     static void read(void const*& buffer, size_t& size, T& value) {
 /*
+	(int**)buffer;
+	(void*)size;
+	(void*)value;
+*/
+/*
         static_assert(std::is_trivially_copyable<T>::value,
                       "Cannot unflatten a non-trivially-copyable type");
+*/
         memcpy(&value, buffer, sizeof(T));
         advance(buffer, size, sizeof(T));
-*/
     }
 };
 
