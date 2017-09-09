@@ -76,7 +76,7 @@ cc_library {
         "Flattenable.cpp",
     ],
 
-    cflags: ["-DSTE_HARDWARE", "-DSTE_SAMSUNG_HARDWARE"],
+    cflags: ["-DSTE_HARDWARE", "-DSTE_SAMSUNG_HARDWARE", "-DNEEDS_VECTORIMPL_SYMBOLS"],
     include_dirs: ["external/safe-iop/include"],
     header_libs: [
         "libutils_headers",
