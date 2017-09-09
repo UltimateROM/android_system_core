@@ -319,8 +319,7 @@ static void run(const char* source_path, const char* label, uid_t uid,
 
 static bool sdcardfs_setup(const std::string& source_path, const std::string& dest_path, uid_t fsuid,
                         gid_t fsgid, bool multi_user, userid_t userid, gid_t gid, mode_t mask) {
-    std::string opts = android::base::StringPrintf("fsuid=%d,fsgid=%d,%smask=%d,userid=%d,gid=%d",
-            fsuid, fsgid, multi_user?"multiuser,":"", mask, userid, gid);
+    std::string opts = android::base::StringPrintf("uid=1023,gid=1023,wgid=1023,derive=unified");
 
     if (mount(source_path.c_str(), dest_path.c_str(), "sdcardfs",
               MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME, opts.c_str()) == -1) {
