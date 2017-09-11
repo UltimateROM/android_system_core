@@ -32,8 +32,7 @@ init_cflags += \
     $(init_options) \
     -Wall -Wextra \
     -Wno-unused-parameter \
-    -Werror \
-    -std=gnu++1z \
+    -std=gnu++1z
 
 # --
 
@@ -158,7 +157,7 @@ LOCAL_SHARED_LIBRARIES += \
 LOCAL_STATIC_LIBRARIES := libinit
 LOCAL_SANITIZE := integer
 LOCAL_CLANG := true
-LOCAL_CPPFLAGS := -Wall -Wextra -Werror
+LOCAL_CPPFLAGS := -Wall -Wextra
 include $(BUILD_NATIVE_TEST)
 
 
