@@ -74,6 +74,8 @@ void property_init() {
 }
 
 static bool check_mac_perms(const std::string& name, char* sctx, struct ucred* cr) {
+    if (is_selinux_enabled() <= 0)
+        return 1;
 
     if (!sctx) {
       return false;
@@ -178,10 +180,12 @@ uint32_t property_set(const std::string& name, const std::string& value) {
         return PROP_ERROR_INVALID_VALUE;
     }
 
-    if (name == "selinux.restorecon_recursive" && valuelen > 0) {
-        if (restorecon(value.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE) != 0) {
-            LOG(ERROR) << "Failed to restorecon_recursive " << value;
-        }
+    if (is_selinux_enabled()) {
+       if (name == "selinux.restorecon_recursive" && valuelen > 0) {
+          if (restorecon(value.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE) != 0) {
+             LOG(ERROR) << "Failed to restorecon_recursive " << value;
+          }
+       }
     }
 
     prop_info* pi = (prop_info*) __system_property_find(name.c_str());
