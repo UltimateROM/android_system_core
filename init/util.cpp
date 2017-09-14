@@ -414,6 +414,11 @@ void panic() {
     DoReboot(ANDROID_RB_RESTART2, "reboot", "recovery", false);
 }
 
+void panic1(char *reason) {
+    LOG(ERROR) << "panic: rebooting to recovery: " << reason;
+    DoReboot(ANDROID_RB_RESTART2, "reboot", "recovery", false);
+}
+
 std::ostream& operator<<(std::ostream& os, const Timer& t) {
     os << t.duration_s() << " seconds";
     return os;

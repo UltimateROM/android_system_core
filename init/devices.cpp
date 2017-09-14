@@ -894,7 +894,7 @@ static void handle_firmware_event(uevent* uevent) {
     if (pid == 0) {
         Timer t;
         process_firmware_event(uevent);
-        LOG(INFO) << "loading " << uevent->path << " took " << t;
+        LOG(ERROR) << "loading " << uevent->path << " took " << t;
         _exit(EXIT_SUCCESS);
     } else if (pid == -1) {
         PLOG(ERROR) << "could not fork to process firmware event for " << uevent->firmware;
