@@ -176,11 +176,9 @@ static void fixup_sys_perms(const char* upath, const char* subsystem) {
         chmod(attr_file.c_str(), dp->perm);
     }
 
-    if (is_selinux_enabled()) {
-       if (access(path.c_str(), F_OK) == 0) {
-          LOG(VERBOSE) << "restorecon_recursive: " << path;
-          restorecon(path.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE);
-       }
+    if (access(path.c_str(), F_OK) == 0) {
+        LOG(VERBOSE) << "restorecon_recursive: " << path;
+        restorecon(path.c_str(), SELINUX_ANDROID_RESTORECON_RECURSE);
     }
 }
 
@@ -257,8 +255,24 @@ static void make_device(const char *path,
         PLOG(ERROR) << "setegid(" << gid << ") for " << path << " device failed";
         goto out;
     }
+    /* If the node already exists update its SELinux label to handle cases when
+     * it was created with the wrong context during coldboot procedure. */
+    if (mknod(path, mode, dev) && (errno == EEXIST) && secontext) {
 
-    mknod(path, mode, dev);
+        char* fcon = nullptr;
+        int rc = lgetfilecon(path, &fcon);
+        if (rc < 0) {
+            PLOG(ERROR) << "Cannot get SELinux label on '" << path << "' device";
+            goto out;
+        }
+
+        bool different = strcmp(fcon, secontext) != 0;
+        freecon(fcon);
+
+        if (different && lsetfilecon(path, secontext)) {
+            PLOG(ERROR) << "Cannot set '" << secontext << "' SELinux label on '" << path << "' device";
+        }
+    }
 
 out:
     chown(path, uid, -1);
@@ -934,7 +948,7 @@ coldboot_action_t handle_device_fd(coldboot_callback fn)
 {
     coldboot_action_t ret = handle_device_fd_with(
         [&](uevent* uevent) -> coldboot_action_t {
-            if (sehandle && selinux_status_updated() > 0) {
+            if (selinux_status_updated() > 0) {
                 struct selabel_handle *sehandle2;
                 sehandle2 = selinux_android_file_context_handle();
                 if (sehandle2) {
@@ -1020,12 +1034,9 @@ static coldboot_action_t coldboot(const char *path, coldboot_callback fn)
 }
 
 void device_init(const char* path, coldboot_callback fn) {
-    sehandle = NULL;
-    if (is_selinux_enabled() > 0) {
+    if (!sehandle) {
         sehandle = selinux_android_file_context_handle();
-        selinux_status_open(true);
     }
-
     // open uevent socket and selinux status only if it hasn't been
     // done before
     if (device_fd == -1) {

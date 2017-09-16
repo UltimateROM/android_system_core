@@ -538,43 +538,26 @@ static void selinux_init_all_handles(void)
     sehandle_prop = selinux_android_prop_context_handle();
 }
 
-enum selinux_enforcing_status { SELINUX_DISABLED, SELINUX_PERMISSIVE, SELINUX_ENFORCING };
+enum selinux_enforcing_status { SELINUX_PERMISSIVE, SELINUX_ENFORCING };
 
-#if 0
 static selinux_enforcing_status selinux_status_from_cmdline() {
     selinux_enforcing_status status = SELINUX_ENFORCING;
 
-    std::function<void(char*,bool)> fn = [&](char* name, bool in_qemu) {
-        char *value = strchr(name, '=');
-        if (value == nullptr) { return; }
-        *value++ = '\0';
-        if (strcmp(name, "androidboot.selinux") == 0) {
-            if (strcmp(value, "disabled") == 0) {
-                status = SELINUX_DISABLED;
-            } else if (strcmp(value, "permissive") == 0) {
-                status = SELINUX_PERMISSIVE;
-            }
-         }
-     });
-
-     return status;
- }
-#endif
-
-static bool selinux_is_disabled(void)
-{
-     return true;
-#if 0
-    if (ALLOW_DISABLE_SELINUX) {
-        if (access("/sys/fs/selinux", F_OK) != 0) {
-            // SELinux is not compiled into the kernel, or has been disabled
-            // via the kernel command line "selinux=0".
-            return true;
+    import_kernel_cmdline(false, [&](const std::string& key, const std::string& value, bool in_qemu) {
+        if (key == "androidboot.selinux" && value == "permissive") {
+            status = SELINUX_PERMISSIVE;
         }
-        return true /*selinux_status_from_cmdline() == SELINUX_DISABLED */;
+    });
+
+    return status;
+}
+
+static bool selinux_is_enforcing(void)
+{
+    if (ALLOW_PERMISSIVE_SELINUX) {
+        return selinux_status_from_cmdline() == SELINUX_ENFORCING;
     }
-    return false;
-#endif
+    return true;
 }
 
 static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_t len) {
@@ -865,18 +848,20 @@ static void selinux_initialize(bool in_kernel_domain) {
     cb.func_audit = audit_callback;
     selinux_set_callback(SELINUX_CB_AUDIT, cb);
 
-    if (selinux_is_disabled()) {
-        return;
-    }
-
     if (in_kernel_domain) {
         LOG(INFO) << "Loading SELinux policy";
         if (!selinux_load_policy()) {
             panic();
         }
 
-        bool is_enforcing = false;
-        security_setenforce(is_enforcing);
+        bool kernel_enforcing = (security_getenforce() == 1);
+        bool is_enforcing = selinux_is_enforcing();
+        if (kernel_enforcing != is_enforcing) {
+            if (security_setenforce(is_enforcing)) {
+                PLOG(ERROR) << "security_setenforce(%s) failed" << (is_enforcing ? "true" : "false");
+                security_failure();
+            }
+        }
 
         if (!write_file("/sys/fs/selinux/checkreqprot", "0")) {
             security_failure();
@@ -894,32 +879,30 @@ static void selinux_initialize(bool in_kernel_domain) {
 // This must happen before /dev is populated by ueventd.
 static void selinux_restore_context() {
     LOG(INFO) << "Running restorecon...";
-    if (is_selinux_enabled()) {
-       restorecon("/dev");
-       restorecon("/dev/kmsg");
-       restorecon("/dev/socket");
-       restorecon("/dev/random");
-       restorecon("/dev/urandom");
-       restorecon("/dev/__properties__");
+    restorecon("/dev");
+    restorecon("/dev/kmsg");
+    restorecon("/dev/socket");
+    restorecon("/dev/random");
+    restorecon("/dev/urandom");
+    restorecon("/dev/__properties__");
 
-       restorecon("/file_contexts.bin");
-       restorecon("/plat_file_contexts");
-       restorecon("/nonplat_file_contexts");
-       restorecon("/plat_property_contexts");
-       restorecon("/nonplat_property_contexts");
-       restorecon("/plat_seapp_contexts");
-       restorecon("/nonplat_seapp_contexts");
-       restorecon("/plat_service_contexts");
-       restorecon("/nonplat_service_contexts");
-       restorecon("/plat_hwservice_contexts");
-       restorecon("/nonplat_hwservice_contexts");
-       restorecon("/sepolicy");
-       restorecon("/vndservice_contexts");
+    restorecon("/file_contexts.bin");
+    restorecon("/plat_file_contexts");
+    restorecon("/nonplat_file_contexts");
+    restorecon("/plat_property_contexts");
+    restorecon("/nonplat_property_contexts");
+    restorecon("/plat_seapp_contexts");
+    restorecon("/nonplat_seapp_contexts");
+    restorecon("/plat_service_contexts");
+    restorecon("/nonplat_service_contexts");
+    restorecon("/plat_hwservice_contexts");
+    restorecon("/nonplat_hwservice_contexts");
+    restorecon("/sepolicy");
+    restorecon("/vndservice_contexts");
 
-       restorecon("/sys", SELINUX_ANDROID_RESTORECON_RECURSE);
-       restorecon("/dev/block", SELINUX_ANDROID_RESTORECON_RECURSE);
-       restorecon("/dev/device-mapper");
-    }
+    restorecon("/sys", SELINUX_ANDROID_RESTORECON_RECURSE);
+    restorecon("/dev/block", SELINUX_ANDROID_RESTORECON_RECURSE);
+    restorecon("/dev/device-mapper");
 }
 
 // Set the UDC controller for the ConfigFS USB Gadgets.
@@ -995,14 +978,13 @@ int main(int argc, char** argv) {
         mkdir("/dev/socket", 0755);
         mount("devpts", "/dev/pts", "devpts", 0, NULL);
         #define MAKE_STR(x) __STRING(x)
-        mount("proc", "/proc", "proc", 0, "gid=" MAKE_STR(AID_READPROC));
+        mount("proc", "/proc", "proc", 0, "hidepid=2,gid=" MAKE_STR(AID_READPROC));
         // Don't expose the raw commandline to unprivileged processes.
         chmod("/proc/cmdline", 0440);
         gid_t groups[] = { AID_READPROC };
         setgroups(arraysize(groups), groups);
         mount("sysfs", "/sys", "sysfs", 0, NULL);
-        if (is_selinux_enabled())
-           mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL);
+        mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL);
         mknod("/dev/kmsg", S_IFCHR | 0600, makedev(1, 11));
         mknod("/dev/random", S_IFCHR | 0666, makedev(1, 8));
         mknod("/dev/urandom", S_IFCHR | 0666, makedev(1, 9));
@@ -1027,11 +1009,9 @@ int main(int argc, char** argv) {
 
         // We're in the kernel domain, so re-exec init to transition to the init domain now
         // that the SELinux policy has been loaded.
-        if (is_selinux_enabled()) {
-           if (restorecon("/init") == -1) {
-              PLOG(ERROR) << "restorecon failed";
-              security_failure();
-           }
+        if (restorecon("/init") == -1) {
+            PLOG(ERROR) << "restorecon failed";
+            security_failure();
         }
         LOG(INFO) << "restorecon (/init)";
 
