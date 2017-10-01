@@ -6,6 +6,7 @@ cc_library {
 
     srcs: [
         "autosuspend.c",
+        "autosuspend_autosleep.c",
         "autosuspend_earlysuspend.c",
         "autosuspend_wakeup_count.c",
     ],
