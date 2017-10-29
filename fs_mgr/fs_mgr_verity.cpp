@@ -89,32 +89,7 @@ extern struct fs_info info;
 
 static RSA *load_key(const char *path)
 {
-    uint8_t key_data[ANDROID_PUBKEY_ENCODED_SIZE];
-
-    FILE* f = fopen(path, "r");
-    if (!f) {
-        ERROR("Can't open '%s'\n", path);
-        free(key_data);
-        return NULL;
-    }
-
-    if (!fread(key_data, sizeof(key_data), 1, f)) {
-        ERROR("Could not read key!\n");
-        fclose(f);
-        free(key_data);
-        return NULL;
-    }
-
-    fclose(f);
-
-    RSA* key = NULL;
-    if (!android_pubkey_decode(key_data, sizeof(key_data), &key)) {
-        ERROR("Could not parse key!\n");
-        free(key_data);
-        return NULL;
-    }
-
-    return key;
+    return NULL;
 }
 
 static int verify_table(const uint8_t *signature, size_t signature_size,

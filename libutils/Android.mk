@@ -57,7 +57,7 @@ LOCAL_CFLAGS += $(host_commonCflags)
 # Under MinGW, ctype.h doesn't need multi-byte support
 LOCAL_CFLAGS_windows := -DMB_CUR_MAX=1
 LOCAL_MULTILIB := both
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_C_INCLUDES += external/safe-iop/include
 include $(BUILD_HOST_STATIC_LIBRARY)
 
