@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#if defined(__ANDROID__)
 
 #include <utils/Flattenable.h>
 
@@ -22,3 +23,5 @@ Flattenable::~Flattenable() {
 }
 
 }; // namespace android
+
+#endif
