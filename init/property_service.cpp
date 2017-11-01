@@ -43,14 +43,15 @@
 #include <sys/mman.h>
 #include <private/android_filesystem_config.h>
 
-#include <selinux/selinux.h>
-#include <selinux/label.h>
+//#include <selinux/selinux.h>
+//#include <selinux/label.h>
 
 #include <fs_mgr.h>
 #include <android-base/file.h>
 #include "bootimg.h"
 
 #include "property_service.h"
+#include "dummy.h"
 #include "init.h"
 #include "util.h"
 #include "log.h"
@@ -73,31 +74,7 @@ void property_init() {
 
 static int check_mac_perms(const char *name, char *sctx, struct ucred *cr)
 {
-    if (is_selinux_enabled() <= 0)
         return 1;
-
-    char *tctx = NULL;
-    int result = 0;
-    property_audit_data audit_data;
-
-    if (!sctx)
-        goto err;
-
-    if (!sehandle_prop)
-        goto err;
-
-    if (selabel_lookup(sehandle_prop, &tctx, name, 1) != 0)
-        goto err;
-
-    audit_data.name = name;
-    audit_data.cr = cr;
-
-    if (selinux_check_access(sctx, tctx, "property_service", "set", reinterpret_cast<void*>(&audit_data)) == 0)
-        result = 1;
-
-    freecon(tctx);
- err:
-    return result;
 }
 
 static int check_control_mac_perms(const char *name, char *sctx, struct ucred *cr)
@@ -204,22 +181,9 @@ static int property_set_impl(const char* name, const char* value) {
     if (!is_legal_property_name(name, namelen)) return -1;
     if (valuelen >= PROP_VALUE_MAX) return -1;
 
-    if (strcmp("selinux.reload_policy", name) == 0 && strcmp("1", value) == 0) {
-        if (selinux_reload_policy() != 0) {
-            ERROR("Failed to reload policy\n");
-        }
-    } else if (strcmp("selinux.restorecon_recursive", name) == 0 && valuelen > 0) {
-        if (restorecon_recursive(value) != 0) {
-            ERROR("Failed to restorecon_recursive %s\n", value);
-        }
-    }
-
     prop_info* pi = (prop_info*) __system_property_find(name);
 
     if(pi != 0) {
-        /* ro.* properties may NEVER be modified once set */
-        if(!strncmp(name, "ro.", 3)) return -1;
-
         __system_property_update(pi, value, valuelen);
     } else {
         int rc = __system_property_add(name, namelen, value, valuelen);
@@ -316,7 +280,7 @@ static void handle_property_set_fd()
             return;
         }
 
-        getpeercon(s, &source_ctx);
+        //getpeercon(s, &source_ctx);
 
         if(memcmp(msg.name,"ctl.",4) == 0) {
             // Keep the old close-socket-early behavior when handling
@@ -341,7 +305,7 @@ static void handle_property_set_fd()
             // the property is written to memory.
             close(s);
         }
-        freecon(source_ctx);
+        //freecon(source_ctx);
         break;
 
     default:

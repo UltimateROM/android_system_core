@@ -18,6 +18,7 @@
 #define _INIT_INIT_H
 
 #include <string>
+#include "dummy.h"
 
 class Action;
 class Service;
@@ -35,7 +36,7 @@ void handle_control_message(const std::string& msg, const std::string& arg);
 
 void property_changed(const char *name, const char *value);
 
-int selinux_reload_policy(void);
+//int selinux_reload_policy(void);
 
 void register_epoll_handler(int fd, void (*fn)());
 

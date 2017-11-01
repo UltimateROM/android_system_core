@@ -20,7 +20,7 @@
 #include <string.h>
 #include <sys/uio.h>
 
-#include <selinux/selinux.h>
+//#include <selinux/selinux.h>
 
 #include <android-base/stringprintf.h>
 
@@ -55,6 +55,7 @@ void init_klog_write(int level, const char* fmt, ...) {
 }
 
 int selinux_klog_callback(int type, const char *fmt, ...) {
+#if 0
     int level = KLOG_ERROR_LEVEL;
     if (type == SELINUX_WARNING) {
         level = KLOG_WARNING_LEVEL;
@@ -65,5 +66,6 @@ int selinux_klog_callback(int type, const char *fmt, ...) {
     va_start(ap, fmt);
     init_klog_vwrite(level, fmt, ap);
     va_end(ap);
+#endif
     return 0;
 }

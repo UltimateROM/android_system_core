@@ -22,7 +22,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <log/log.h>
-#include <selinux/android.h>
+////#include <selinux/android.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -73,7 +73,7 @@ static bool secure_mkdirs(const std::string& path) {
                 return false;
             }
             // Not all filesystems support setting SELinux labels. http://b/23530370.
-            selinux_android_restorecon(partial_path.c_str(), 0);
+            //selinux_android_restorecon(partial_path.c_str(), 0);
         }
     }
     return true;
@@ -174,7 +174,7 @@ static bool handle_send_file(int s, const char* path, uid_t uid,
         }
 
         // Not all filesystems support setting SELinux labels. http://b/23530370.
-        selinux_android_restorecon(path, 0);
+        //selinux_android_restorecon(path, 0);
 
         // fchown clears the setuid bit - restore it if present.
         // Ignore the result of calling fchmod. It's not supported

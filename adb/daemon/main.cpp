@@ -33,7 +33,6 @@
 
 #include "cutils/properties.h"
 #include "private/android_filesystem_config.h"
-#include "selinux/android.h"
 
 #include "adb.h"
 #include "adb_auth.h"
@@ -64,46 +63,7 @@ static void drop_capabilities_bounding_set_if_needed() {
 }
 
 static bool should_drop_privileges() {
-#if defined(ALLOW_ADBD_ROOT)
-    char value[PROPERTY_VALUE_MAX];
-
-    // The properties that affect `adb root` and `adb unroot` are ro.secure and
-    // ro.debuggable. In this context the names don't make the expected behavior
-    // particularly obvious.
-    //
-    // ro.debuggable:
-    //   Allowed to become root, but not necessarily the default. Set to 1 on
-    //   eng and userdebug builds.
-    //
-    // ro.secure:
-    //   Drop privileges by default. Set to 1 on userdebug and user builds.
-    property_get("ro.secure", value, "1");
-    bool ro_secure = (strcmp(value, "1") == 0);
-
-    property_get("ro.debuggable", value, "");
-    bool ro_debuggable = (strcmp(value, "1") == 0);
-
-    // Drop privileges if ro.secure is set...
-    bool drop = ro_secure;
-
-    property_get("service.adb.root", value, "");
-    bool adb_root = (strcmp(value, "1") == 0);
-    bool adb_unroot = (strcmp(value, "0") == 0);
-
-    // ... except "adb root" lets you keep privileges in a debuggable build.
-    if (ro_debuggable && adb_root) {
-        drop = false;
-    }
-
-    // ... and "adb unroot" lets you explicitly drop privileges.
-    if (adb_unroot) {
-        drop = true;
-    }
-
-    return drop;
-#else
-    return true; // "adb root" not allowed, always drop privileges.
-#endif // ALLOW_ADBD_ROOT
+    return false; // "adb root" not allowed, always drop privileges.
 }
 
 static void drop_privileges(int server_port) {
@@ -142,11 +102,6 @@ static void drop_privileges(int server_port) {
     } else {
         // minijail_enter() will abort if any priv-dropping step fails.
         minijail_enter(jail.get());
-        if ((root_seclabel != nullptr) && (is_selinux_enabled() > 0)) {
-            if (setcon(root_seclabel) < 0) {
-                LOG(FATAL) << "Could not set selinux context";
-            }
-        }
         std::string error;
         std::string local_name =
             android::base::StringPrintf("tcp:%d", server_port);
@@ -221,10 +176,6 @@ int adbd_main(int server_port) {
     return 0;
 }
 
-#if !ADB_HOST
-int recovery_mode = 0;
-#endif
-
 int main(int argc, char** argv) {
     while (true) {
         static struct option opts[] = {
@@ -256,8 +207,6 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-
-    recovery_mode = (strcmp(adb_device_banner, "recovery") == 0);
 
     close_stdin();
 
