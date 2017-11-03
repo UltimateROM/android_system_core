@@ -47,7 +47,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_STATIC_LIBRARIES := libinit_parser
 LOCAL_CLANG := true
-include $(BUILD_HOST_NATIVE_TEST)
+#include $(BUILD_HOST_NATIVE_TEST)
 endif
 
 include $(CLEAR_VARS)
@@ -137,27 +137,6 @@ endif
 include $(BUILD_EXECUTABLE)
 
 
-# Unit tests.
-# =========================================================
-include $(CLEAR_VARS)
-LOCAL_MODULE := init_tests
-LOCAL_SRC_FILES := \
-    init_parser_test.cpp \
-    property_service_test.cpp \
-    service_test.cpp \
-    util_test.cpp \
-
-LOCAL_SHARED_LIBRARIES += \
-    libcutils \
-    libbase \
-
-LOCAL_STATIC_LIBRARIES := libinit
-LOCAL_SANITIZE := integer
-LOCAL_CLANG := true
-LOCAL_CPPFLAGS := -Wall -Wextra
-include $(BUILD_NATIVE_TEST)
-
-
 # Include targets in subdirs.
 # =========================================================
-include $(call all-makefiles-under,$(LOCAL_PATH))
+#include $(call all-makefiles-under,$(LOCAL_PATH))
