@@ -77,6 +77,8 @@ void property_init() {
 }
 
 static bool check_mac_perms(const std::string& name, char* sctx, struct ucred* cr) {
+    if (is_selinux_enabled() <= 0)
+        return 1;
 
     if (!sctx) {
       return false;
