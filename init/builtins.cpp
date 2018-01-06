@@ -86,8 +86,8 @@ static int insmod(const char *filename, const char *options, int flags) {
     if (fd == -1) {
         PLOG(ERROR) << "insmod: open(\"" << filename << "\") failed";
 #else
-    std::string module;
-    if (!read_file(filename, &module)) {
+    std::string module, err;
+    if (!ReadFile(filename, &module, &err)) {
 #endif
         return -1;
     }
