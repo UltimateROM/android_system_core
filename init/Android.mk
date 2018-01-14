@@ -8,7 +8,7 @@ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 init_options += \
     -DALLOW_LOCAL_PROP_OVERRIDE=1 \
     -DALLOW_PERMISSIVE_SELINUX=1 \
-    -DREBOOT_BOOTLOADER_ON_PANIC=1 \
+    -DREBOOT_BOOTLOADER_ON_PANIC=0 \
     -DDUMP_ON_UMOUNT_FAILURE=1
 else
 init_options += \
@@ -36,8 +36,7 @@ init_cflags += \
     $(init_options) \
     -Wall -Wextra \
     -Wno-unused-parameter \
-    -Werror \
-    -std=gnu++1z \
+    -std=gnu++1z
 
 # --
 
@@ -55,6 +54,10 @@ LOCAL_SRC_FILES:= \
     ueventd.cpp \
     watchdogd.cpp \
     vendor_init.cpp
+
+ifeq ($(KERNEL_HAS_FINIT_MODULE), false)
+LOCAL_CFLAGS += -DNO_FINIT_MODULE
+endif
 
 LOCAL_MODULE:= init
 LOCAL_C_INCLUDES += \

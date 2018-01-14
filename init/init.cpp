@@ -430,8 +430,8 @@ static int set_mmap_rnd_bits_action(const std::vector<std::string>& args)
 #endif
 
     if (ret == -1) {
-        LOG(ERROR) << "Unable to set adequate mmap entropy value!";
-        security_failure();
+        LOG(INFO) << "Unable to set adequate mmap entropy value!";
+        // security_failure();
     }
     return ret;
 }
@@ -582,14 +582,6 @@ static selinux_enforcing_status selinux_status_from_cmdline() {
     });
 
     return status;
-}
-
-static bool selinux_is_enforcing(void)
-{
-    if (ALLOW_PERMISSIVE_SELINUX) {
-        return selinux_status_from_cmdline() == SELINUX_ENFORCING;
-    }
-    return true;
 }
 
 static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_t len) {
@@ -888,7 +880,7 @@ static void selinux_initialize(bool in_kernel_domain) {
         }
 
         bool kernel_enforcing = (security_getenforce() == 1);
-        bool is_enforcing = selinux_is_enforcing();
+        bool is_enforcing = false;
         if (kernel_enforcing != is_enforcing) {
             if (security_setenforce(is_enforcing)) {
                 PLOG(ERROR) << "security_setenforce(%s) failed" << (is_enforcing ? "true" : "false");
@@ -974,6 +966,8 @@ static void InstallRebootSignalHandlers() {
 
         // panic() reboots to bootloader
         panic();
+        // panic1() reboots to recovery
+        panic1();
     };
     action.sa_flags = SA_RESTART;
     sigaction(SIGABRT, &action, nullptr);
