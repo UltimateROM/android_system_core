@@ -147,7 +147,7 @@ include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libadb
-LOCAL_MODULE_HOST_OS := linux
+LOCAL_MODULE_HOST_OS := darwin linux windows
 LOCAL_CFLAGS := $(LIBADB_CFLAGS) -DADB_HOST=1
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -174,12 +174,29 @@ LOCAL_MULTILIB := first
 
 include $(BUILD_HOST_STATIC_LIBRARY)
 
+include $(CLEAR_VARS)
+LOCAL_CLANG := true
+LOCAL_MODULE := adbd_test
+LOCAL_CFLAGS := -DADB_HOST=0 $(LIBADB_CFLAGS)
+LOCAL_SRC_FILES := \
+    $(LIBADB_TEST_SRCS) \
+    $(LIBADB_TEST_linux_SRCS) \
+    shell_service.cpp \
+    shell_service_protocol.cpp \
+    shell_service_protocol_test.cpp \
+    shell_service_test.cpp \
+
+LOCAL_SANITIZE := $(adb_target_sanitize)
+LOCAL_STATIC_LIBRARIES := libadbd libcrypto_utils libcrypto libusb libmdnssd
+LOCAL_SHARED_LIBRARIES := liblog libbase libcutils
+include $(BUILD_NATIVE_TEST)
+
 # libdiagnose_usb
 # =========================================================
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libdiagnose_usb
-LOCAL_MODULE_HOST_OS := linux
+LOCAL_MODULE_HOST_OS := darwin linux windows
 LOCAL_CFLAGS := $(LIBADB_CFLAGS)
 LOCAL_SRC_FILES := diagnose_usb.cpp
 # Even though we're building a static library (and thus there's no link step for
@@ -187,71 +204,53 @@ LOCAL_SRC_FILES := diagnose_usb.cpp
 LOCAL_STATIC_LIBRARIES := libbase
 include $(BUILD_HOST_STATIC_LIBRARY)
 
-# adbd device daemon
+# adb_test
 # =========================================================
 
 include $(CLEAR_VARS)
-
-LOCAL_CLANG := true
-
+LOCAL_MODULE := adb_test
+LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_CFLAGS := -DADB_HOST=1 $(LIBADB_CFLAGS)
+LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
+LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
+LOCAL_CFLAGS_darwin := $(LIBADB_darwin_CFLAGS)
 LOCAL_SRC_FILES := \
-    daemon/main.cpp \
-    daemon/mdns.cpp \
+    $(LIBADB_TEST_SRCS) \
+    adb_client.cpp \
+    bugreport.cpp \
+    bugreport_test.cpp \
+    line_printer.cpp \
     services.cpp \
-    file_sync_service.cpp \
-    framebuffer_service.cpp \
-    remount_service.cpp \
-    set_verity_enable_state_service.cpp \
-    shell_service.cpp \
     shell_service_protocol.cpp \
+    shell_service_protocol_test.cpp \
 
-LOCAL_CFLAGS := \
-    $(ADB_COMMON_CFLAGS) \
-    $(ADB_COMMON_linux_CFLAGS) \
-    -DADB_HOST=0 \
-    -D_GNU_SOURCE \
-    -Wno-deprecated-declarations \
-
-LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=0
-
-LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
-LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
-
-ifeq ($(TARGET_USES_LEGACY_ADB_INTERFACE),true)
-LOCAL_CFLAGS += -DLEGACY_ADB_INTERFACE
-endif
-
-LOCAL_MODULE := adbd
-
-LOCAL_FORCE_STATIC_EXECUTABLE := true
-
-LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
-LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
-
-LOCAL_SANITIZE := $(adb_target_sanitize)
-LOCAL_STRIP_MODULE := keep_symbols
+LOCAL_SRC_FILES_linux := $(LIBADB_TEST_linux_SRCS)
+LOCAL_SRC_FILES_darwin := $(LIBADB_TEST_darwin_SRCS)
+LOCAL_SRC_FILES_windows := $(LIBADB_TEST_windows_SRCS)
+LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_STATIC_LIBRARIES := \
-    libadbd \
-    libavb_user \
-    libbase \
-    libqemu_pipe \
-    libbootloader_message \
-    libfs_mgr \
-    libfec \
-    libfec_rs \
-    libselinux \
-    liblog \
-    libext4_utils \
-    libsquashfs_utils \
-    libcutils \
+    libadb \
     libbase \
     libcrypto_utils \
     libcrypto \
-    libminijail \
+    libcutils \
+    libdiagnose_usb \
     libmdnssd \
-    libdebuggerd_handler \
+    libgmock_host \
 
-include $(BUILD_EXECUTABLE)
+LOCAL_STATIC_LIBRARIES_linux := libusb
+LOCAL_STATIC_LIBRARIES_darwin := libusb
+
+# Set entrypoint to wmain from sysdeps_win32.cpp instead of main
+LOCAL_LDFLAGS_windows := -municode
+LOCAL_LDLIBS_linux := -lrt -ldl -lpthread
+LOCAL_LDLIBS_darwin := -framework CoreFoundation -framework IOKit -lobjc
+LOCAL_LDLIBS_windows := -lws2_32 -luserenv
+LOCAL_STATIC_LIBRARIES_windows := AdbWinApi
+
+LOCAL_MULTILIB := first
+
+include $(BUILD_HOST_NATIVE_TEST)
 
 # adb host tool
 # =========================================================
@@ -295,7 +294,7 @@ LOCAL_CFLAGS_darwin := \
 
 LOCAL_MODULE := adb
 LOCAL_MODULE_TAGS := debug
-LOCAL_MODULE_HOST_OS := linux
+LOCAL_MODULE_HOST_OS := darwin linux windows
 
 LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_STATIC_LIBRARIES := \
@@ -328,6 +327,72 @@ ifdef HOST_CROSS_OS
 # Archive adb.exe for win_sdk build.
 $(call dist-for-goals,win_sdk,$(ALL_MODULES.host_cross_adb.BUILT))
 endif
+
+
+# adbd device daemon
+# =========================================================
+
+include $(CLEAR_VARS)
+
+LOCAL_CLANG := true
+
+LOCAL_SRC_FILES := \
+    daemon/main.cpp \
+    daemon/mdns.cpp \
+    services.cpp \
+    file_sync_service.cpp \
+    framebuffer_service.cpp \
+    remount_service.cpp \
+    set_verity_enable_state_service.cpp \
+    shell_service.cpp \
+    shell_service_protocol.cpp \
+
+LOCAL_CFLAGS := \
+    $(ADB_COMMON_CFLAGS) \
+    $(ADB_COMMON_linux_CFLAGS) \
+    -DADB_HOST=0 \
+    -D_GNU_SOURCE \
+    -Wno-deprecated-declarations \
+
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
+
+ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
+LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
+endif
+
+ifeq ($(TARGET_USES_LEGACY_ADB_INTERFACE),true)
+LOCAL_CFLAGS += -DLEGACY_ADB_INTERFACE
+endif
+
+LOCAL_MODULE := adbd
+
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+
+LOCAL_SANITIZE := $(adb_target_sanitize)
+LOCAL_STRIP_MODULE := keep_symbols
+LOCAL_STATIC_LIBRARIES := \
+    libadbd \
+    libavb_user \
+    libbase \
+    libqemu_pipe \
+    libbootloader_message \
+    libfs_mgr \
+    libfec \
+    libfec_rs \
+    libselinux \
+    liblog \
+    libext4_utils \
+    libsquashfs_utils \
+    libcutils \
+    libbase \
+    libcrypto_utils \
+    libcrypto \
+    libminijail \
+    libmdnssd \
+    libdebuggerd_handler \
+
+include $(BUILD_EXECUTABLE)
 
 # adb integration test
 # =========================================================
