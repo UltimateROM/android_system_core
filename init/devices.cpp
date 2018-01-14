@@ -248,8 +248,24 @@ void DeviceHandler::MakeDevice(const std::string& path, bool block, int major, i
         PLOG(ERROR) << "setegid(" << gid << ") for " << path << " device failed";
         goto out;
     }
+    /* If the node already exists update its SELinux label to handle cases when
+     * it was created with the wrong context during coldboot procedure. */
+    if (mknod(path.c_str(), mode, dev) && (errno == EEXIST) && secontext) {
+        char* fcon = nullptr;
+        int rc = lgetfilecon(path.c_str(), &fcon);
+        if (rc < 0) {
+            PLOG(ERROR) << "Cannot get SELinux label on '" << path << "' device";
+            goto out;
+        }
 
-    mknod(path.c_str(), mode, dev);
+        bool different = strcmp(fcon, secontext) != 0;
+        freecon(fcon);
+
+        if (different && lsetfilecon(path.c_str(), secontext)) {
+            PLOG(ERROR) << "Cannot set '" << secontext << "' SELinux label on '" << path
+                        << "' device";
+        }
+    }
 
 out:
     chown(path.c_str(), uid, -1);

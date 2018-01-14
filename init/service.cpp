@@ -64,40 +64,37 @@ static std::string ComputeContextFromExecutable(std::string& service_name,
     char* raw_con = nullptr;
     char* raw_filecon = nullptr;
 
-    if (is_selinux_enabled() > 0) {
-        if (getcon(&raw_con) == -1) {
-            LOG(ERROR) << "could not get context while starting '" << service_name << "'";
-            return "";
-        }
-        std::unique_ptr<char> mycon(raw_con);
+    if (getcon(&raw_con) == -1) {
+        LOG(ERROR) << "could not get context while starting '" << service_name << "'";
+        return "";
+    }
+    std::unique_ptr<char> mycon(raw_con);
 
-        if (getfilecon(service_path.c_str(), &raw_filecon) == -1) {
-            LOG(ERROR) << "could not get file context while starting '" << service_name << "'";
-            return "";
-        }
-        std::unique_ptr<char> filecon(raw_filecon);
+    if (getfilecon(service_path.c_str(), &raw_filecon) == -1) {
+        LOG(ERROR) << "could not get file context while starting '" << service_name << "'";
+        return "";
+    }
+    std::unique_ptr<char> filecon(raw_filecon);
 
-        char* new_con = nullptr;
-        int rc = security_compute_create(mycon.get(), filecon.get(),
-                                    string_to_security_class("process"), &new_con);
-        if (rc == 0) {
-          computed_context = new_con;
-          free(new_con);
-        }
-        if (rc == 0 && computed_context == mycon.get()) {
-          LOG(ERROR) << "service " << service_name << " does not have a SELinux domain defined";
+    char* new_con = nullptr;
+    int rc = security_compute_create(mycon.get(), filecon.get(),
+                                     string_to_security_class("process"), &new_con);
+    if (rc == 0) {
+        computed_context = new_con;
+        free(new_con);
+    }
+    if (rc == 0 && computed_context == mycon.get()) {
+        LOG(ERROR) << "service " << service_name << " does not have a SELinux domain defined";
 /*        if (selinux_status_getenforce() > 0) {
-              return "";
-          }
+            return "";
+        }
 */
-       }
-
-       if (rc < 0) {
-         LOG(ERROR) << "could not get context while starting '" << service_name << "'";
-         return "";
-       }
     }
 
+    if (rc < 0) {
+        LOG(ERROR) << "could not get context while starting '" << service_name << "'";
+        return "";
+    }
     return computed_context;
 }
 
@@ -286,14 +283,11 @@ void Service::SetProcessAttributes() {
             PLOG(FATAL) << "setuid failed for " << name_;
         }
     }
-    if (is_selinux_enabled() > 0) {
-       if (!seclabel_.empty()) {
-          if (setexeccon(seclabel_.c_str()) < 0) {
-             PLOG(FATAL) << "cannot setexeccon('" << seclabel_ << "') for " << name_;
-          }
-       }
+    if (!seclabel_.empty()) {
+        if (setexeccon(seclabel_.c_str()) < 0) {
+            PLOG(FATAL) << "cannot setexeccon('" << seclabel_ << "') for " << name_;
+        }
     }
-
     if (priority_ != 0) {
         if (setpriority(PRIO_PROCESS, 0, priority_) != 0) {
             PLOG(FATAL) << "setpriority failed for " << name_;
@@ -736,14 +730,12 @@ bool Service::Start() {
     }
 
     std::string scon;
-    if (is_selinux_enabled() > 0) {
-        if (!seclabel_.empty()) {
-            scon = seclabel_;
-        } else {
-            scon = ComputeContextFromExecutable(name_, args_[0]);
-            if (scon == "") {
-                return false;
-            }
+    if (!seclabel_.empty()) {
+        scon = seclabel_;
+    } else {
+        scon = ComputeContextFromExecutable(name_, args_[0]);
+        if (scon == "") {
+            return false;
         }
     }
 
