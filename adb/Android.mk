@@ -145,9 +145,74 @@ LOCAL_WHOLE_STATIC_LIBRARIES := libadbd_usb
 
 include $(BUILD_STATIC_LIBRARY)
 
+# adbd device daemon
+# =========================================================
+
+include $(CLEAR_VARS)
+
+LOCAL_CLANG := true
+
+LOCAL_SRC_FILES := \
+    daemon/main.cpp \
+    daemon/mdns.cpp \
+    services.cpp \
+    file_sync_service.cpp \
+    framebuffer_service.cpp \
+    remount_service.cpp \
+    set_verity_enable_state_service.cpp \
+    shell_service.cpp \
+    shell_service_protocol.cpp \
+
+LOCAL_CFLAGS := \
+    $(ADB_COMMON_CFLAGS) \
+    $(ADB_COMMON_linux_CFLAGS) \
+    -DADB_HOST=0 \
+    -D_GNU_SOURCE \
+    -Wno-deprecated-declarations \
+
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
+
+ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
+LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
+endif
+
+ifeq ($(TARGET_USES_LEGACY_ADB_INTERFACE),true)
+LOCAL_CFLAGS += -DLEGACY_ADB_INTERFACE
+endif
+
+LOCAL_MODULE := adbd
+
+LOCAL_FORCE_STATIC_EXECUTABLE := true
+
+LOCAL_SANITIZE := $(adb_target_sanitize)
+LOCAL_STRIP_MODULE := keep_symbols
+LOCAL_STATIC_LIBRARIES := \
+    libadbd \
+    libavb_user \
+    libbase \
+    libqemu_pipe \
+    libbootloader_message \
+    libfs_mgr \
+    libfec \
+    libfec_rs \
+    libselinux \
+    liblog \
+    libext4_utils \
+    libsquashfs_utils \
+    libcutils \
+    libbase \
+    libcrypto_utils \
+    libcrypto \
+    libminijail \
+    libmdnssd \
+    libdebuggerd_handler \
+
+include $(BUILD_EXECUTABLE)
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := libadb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := $(LIBADB_CFLAGS) -DADB_HOST=1
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -196,7 +261,7 @@ include $(BUILD_NATIVE_TEST)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := libdiagnose_usb
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := $(LIBADB_CFLAGS)
 LOCAL_SRC_FILES := diagnose_usb.cpp
 # Even though we're building a static library (and thus there's no link step for
@@ -209,7 +274,7 @@ include $(BUILD_HOST_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := adb_test
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 LOCAL_CFLAGS := -DADB_HOST=1 $(LIBADB_CFLAGS)
 LOCAL_CFLAGS_windows := $(LIBADB_windows_CFLAGS)
 LOCAL_CFLAGS_linux := $(LIBADB_linux_CFLAGS)
@@ -294,7 +359,7 @@ LOCAL_CFLAGS_darwin := \
 
 LOCAL_MODULE := adb
 LOCAL_MODULE_TAGS := debug
-LOCAL_MODULE_HOST_OS := darwin linux windows
+LOCAL_MODULE_HOST_OS := linux
 
 LOCAL_SANITIZE := $(adb_host_sanitize)
 LOCAL_STATIC_LIBRARIES := \
@@ -328,71 +393,6 @@ ifdef HOST_CROSS_OS
 $(call dist-for-goals,win_sdk,$(ALL_MODULES.host_cross_adb.BUILT))
 endif
 
-
-# adbd device daemon
-# =========================================================
-
-include $(CLEAR_VARS)
-
-LOCAL_CLANG := true
-
-LOCAL_SRC_FILES := \
-    daemon/main.cpp \
-    daemon/mdns.cpp \
-    services.cpp \
-    file_sync_service.cpp \
-    framebuffer_service.cpp \
-    remount_service.cpp \
-    set_verity_enable_state_service.cpp \
-    shell_service.cpp \
-    shell_service_protocol.cpp \
-
-LOCAL_CFLAGS := \
-    $(ADB_COMMON_CFLAGS) \
-    $(ADB_COMMON_linux_CFLAGS) \
-    -DADB_HOST=0 \
-    -D_GNU_SOURCE \
-    -Wno-deprecated-declarations \
-
-LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
-
-ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
-LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
-LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
-endif
-
-ifeq ($(TARGET_USES_LEGACY_ADB_INTERFACE),true)
-LOCAL_CFLAGS += -DLEGACY_ADB_INTERFACE
-endif
-
-LOCAL_MODULE := adbd
-
-LOCAL_FORCE_STATIC_EXECUTABLE := true
-
-LOCAL_SANITIZE := $(adb_target_sanitize)
-LOCAL_STRIP_MODULE := keep_symbols
-LOCAL_STATIC_LIBRARIES := \
-    libadbd \
-    libavb_user \
-    libbase \
-    libqemu_pipe \
-    libbootloader_message \
-    libfs_mgr \
-    libfec \
-    libfec_rs \
-    libselinux \
-    liblog \
-    libext4_utils \
-    libsquashfs_utils \
-    libcutils \
-    libbase \
-    libcrypto_utils \
-    libcrypto \
-    libminijail \
-    libmdnssd \
-    libdebuggerd_handler \
-
-include $(BUILD_EXECUTABLE)
 
 # adb integration test
 # =========================================================
