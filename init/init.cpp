@@ -430,8 +430,8 @@ static int set_mmap_rnd_bits_action(const std::vector<std::string>& args)
 #endif
 
     if (ret == -1) {
-        LOG(INFO) << "Unable to set adequate mmap entropy value!";
-        // security_failure();
+        LOG(ERROR) << "Unable to set adequate mmap entropy value!";
+        security_failure();
     }
     return ret;
 }
@@ -586,7 +586,10 @@ static selinux_enforcing_status selinux_status_from_cmdline() {
 
 static bool selinux_is_enforcing(void)
 {
-    return false;
+    if (ALLOW_PERMISSIVE_SELINUX) {
+        return selinux_status_from_cmdline() == SELINUX_ENFORCING;
+    }
+    return true;
 }
 
 static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_t len) {
@@ -646,7 +649,6 @@ static bool fork_execve_and_wait_for_completion(const char* filename, char* cons
         }
         // Unreachable because execve will have succeeded and replaced this code
         // with child process's code.
-        PLOG(ERROR) << "fork_execve_and_wait_for_completion";
         _exit(127);
         return false;
     } else {
@@ -955,8 +957,6 @@ static void set_usb_controller() {
     }
 }
 
-void panic1(char *reason);
-
 static void InstallRebootSignalHandlers() {
     // Instead of panic'ing the kernel as is the default behavior when init crashes,
     // we prefer to reboot to bootloader on development builds, as this will prevent
@@ -973,7 +973,7 @@ static void InstallRebootSignalHandlers() {
         }
 
         // panic() reboots to bootloader
-        panic1("sa_handler");
+        panic();
     };
     action.sa_flags = SA_RESTART;
     sigaction(SIGABRT, &action, nullptr);
@@ -1041,11 +1041,9 @@ int main(int argc, char** argv) {
         }
 
         SetInitAvbVersionInRecovery();
-        LOG(INFO) << "SetInitAvbVersionInRecovery";
 
         // Set up SELinux, loading the SELinux policy.
         selinux_initialize(true);
-        LOG(INFO) << "selinux_initialize";
 
         // We're in the kernel domain, so re-exec init to transition to the init domain now
         // that the SELinux policy has been loaded.
@@ -1053,24 +1051,16 @@ int main(int argc, char** argv) {
             PLOG(ERROR) << "restorecon failed";
             security_failure();
         }
-        LOG(INFO) << "restorecon (/init)";
-
 
         setenv("INIT_SECOND_STAGE", "true", 1);
-        LOG(INFO) << "INIT_SECOND_STAGE";
-
 
         static constexpr uint32_t kNanosecondsPerMillisecond = 1e6;
         uint64_t start_ms = start_time.time_since_epoch().count() / kNanosecondsPerMillisecond;
         setenv("INIT_STARTED_AT", std::to_string(start_ms).c_str(), 1);
-        LOG(INFO) << "INIT_STARTED_AT";
 
         char* path = argv[0];
         char* args[] = { path, nullptr };
-
-        LOG(INFO) << "execv(" << path << ")";
         execv(path, args);
-
 
         // execv() only returns if an error happened, in which case we
         // panic and never fall through this conditional.
@@ -1086,53 +1076,38 @@ int main(int argc, char** argv) {
     // will hold things like FBE encryption keys. No process should override
     // its session keyring.
     keyctl_get_keyring_ID(KEY_SPEC_SESSION_KEYRING, 1);
-    LOG(INFO) << "KEYCTL_GET_KEYRING_ID,";
 
     // Indicate that booting is in progress to background fw loaders, etc.
     close(open("/dev/.booting", O_WRONLY | O_CREAT | O_CLOEXEC, 0000));
-    LOG(INFO) << "/dev/.booting";
 
     property_init();
-    LOG(INFO) << "property_init";
 
     // If arguments are passed both on the command line and in DT,
     // properties set in DT always have priority over the command-line ones.
     process_kernel_dt();
-    LOG(INFO) << "process_kernel_dt";
-
     process_kernel_cmdline();
-    LOG(INFO) << "process_kernel_cmdline";
 
     // Propagate the kernel variables to internal variables
     // used by init as well as the current required properties.
     export_kernel_boot_props();
-    LOG(INFO) << "export_kernel_boot_props";
 
     // Make the time that init started available for bootstat to log.
     property_set("ro.boottime.init", getenv("INIT_STARTED_AT"));
-    LOG(INFO) << "ro.boottime.init";
-/*
     property_set("ro.boottime.init.selinux", getenv("INIT_SELINUX_TOOK"));
-    LOG(INFO) << "ro.boottime.init.selinux";
-*/
+
     // Set libavb version for Framework-only OTA match in Treble build.
     const char* avb_version = getenv("INIT_AVB_VERSION");
     if (avb_version) property_set("ro.boot.avb_version", avb_version);
-    LOG(INFO) << "INIT_AVB_VERSION";
 
     // Clean up our environment.
     unsetenv("INIT_SECOND_STAGE");
     unsetenv("INIT_STARTED_AT");
     unsetenv("INIT_SELINUX_TOOK");
     unsetenv("INIT_AVB_VERSION");
-    LOG(INFO) << "Clean up our environment";
 
     // Now set up SELinux for second stage.
     selinux_initialize(false);
-    LOG(INFO) << "selinux_initialize(false)";
-
     selinux_restore_context();
-    LOG(INFO) << "selinux_restore_context";
 
     epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (epoll_fd == -1) {
@@ -1141,20 +1116,14 @@ int main(int argc, char** argv) {
     }
 
     signal_handler_init();
-    LOG(INFO) << "signal_handler_init";
 
     property_load_boot_defaults();
-    LOG(INFO) << "property_load_boot_defaults";
     export_oem_lock_status();
-    LOG(INFO) << "export_oem_lock_status";
     start_property_service();
-    LOG(INFO) << "start_property_service";
     set_usb_controller();
-    LOG(INFO) << "set_usb_controller";
 
     const BuiltinFunctionMap function_map;
     Action::set_function_map(&function_map);
-    LOG(INFO) << "set_function_map";
 
     ActionManager& am = ActionManager::GetInstance();
     ServiceManager& sm = ServiceManager::GetInstance();
@@ -1163,36 +1132,19 @@ int main(int argc, char** argv) {
     parser.AddSectionParser("service", std::make_unique<ServiceParser>(&sm));
     parser.AddSectionParser("on", std::make_unique<ActionParser>(&am));
     parser.AddSectionParser("import", std::make_unique<ImportParser>(&parser));
-    LOG(INFO) << "parser";
-
     std::string bootscript = GetProperty("ro.boot.init_rc", "");
-    LOG(INFO) << "bootscript start";
-
     if (bootscript.empty()) {
         parser.ParseConfig("/init.rc");
-        LOG(INFO) << "parser.ParseConfig";
-
         parser.set_is_system_etc_init_loaded(
                 parser.ParseConfig("/system/etc/init"));
-        LOG(INFO) << "parser.set_is_system_etc_init_loaded";
-
         parser.set_is_vendor_etc_init_loaded(
                 parser.ParseConfig("/vendor/etc/init"));
-
-        LOG(INFO) << "parser.set_is_vendor_etc_init_loaded";
-
         parser.set_is_odm_etc_init_loaded(parser.ParseConfig("/odm/etc/init"));
-        LOG(INFO) << "parser.set_is_odm_etc_init_loaded";
     } else {
         parser.ParseConfig(bootscript);
-        LOG(INFO) << "parser.ParseConfig(bootscript)";
-
         parser.set_is_system_etc_init_loaded(true);
-        LOG(INFO) << "parser.set_is_system_etc_init_loaded";
         parser.set_is_vendor_etc_init_loaded(true);
-        LOG(INFO) << "parser.set_is_vendor_etc_init_loaded";
         parser.set_is_odm_etc_init_loaded(true);
-        LOG(INFO) << "parser.set_is_odm_etc_init_loaded";
     }
 
     // Turning this on and letting the INFO logging be discarded adds 0.2s to
@@ -1200,12 +1152,9 @@ int main(int argc, char** argv) {
     if (false) DumpState();
 
     am.QueueEventTrigger("early-init");
-    LOG(INFO) << "early-init";
 
     // Queue an action that waits for coldboot done so we know ueventd has set up all of /dev...
     am.QueueBuiltinAction(wait_for_coldboot_done_action, "wait_for_coldboot_done");
-    LOG(INFO) << "wait_for_coldboot_done";
-
     // ... so that we can start queuing up actions that require stuff from /dev.
     am.QueueBuiltinAction(mix_hwrng_into_linux_rng_action, "mix_hwrng_into_linux_rng");
     am.QueueBuiltinAction(set_mmap_rnd_bits_action, "set_mmap_rnd_bits");
@@ -1213,16 +1162,12 @@ int main(int argc, char** argv) {
     am.QueueBuiltinAction(keychord_init_action, "keychord_init");
     am.QueueBuiltinAction(console_init_action, "console_init");
 
-    LOG(INFO) << "console_init";
-
     // Trigger all the boot actions to get us started.
     am.QueueEventTrigger("init");
-    LOG(INFO) << "am.QueueEventTrigger(\"init\")";
 
     // Repeat mix_hwrng_into_linux_rng in case /dev/hw_random or /dev/random
     // wasn't ready immediately after wait_for_coldboot_done
     am.QueueBuiltinAction(mix_hwrng_into_linux_rng_action, "mix_hwrng_into_linux_rng");
-    LOG(INFO) << "mix_hwrng_into_linux_rng";
 
     // Don't mount filesystems or start core system services in charger mode.
     std::string bootmode = GetProperty("ro.bootmode", "");
@@ -1231,11 +1176,9 @@ int main(int argc, char** argv) {
     } else {
         am.QueueEventTrigger("late-init");
     }
-    LOG(INFO) << "am.QueueEventTrigger late-init";
 
     // Run all property triggers based on current state of the properties.
     am.QueueBuiltinAction(queue_property_triggers_action, "queue_property_triggers");
-    LOG(INFO) << "queue_property_triggers_action";
 
     while (true) {
         // By default, sleep until something happens.
@@ -1272,7 +1215,6 @@ int main(int argc, char** argv) {
             ((void (*)()) ev.data.ptr)();
         }
     }
-    LOG(INFO) << "while (true)";
 
     return 0;
 }

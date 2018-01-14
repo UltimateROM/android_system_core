@@ -85,12 +85,10 @@ static std::string ComputeContextFromExecutable(std::string& service_name,
     }
     if (rc == 0 && computed_context == mycon.get()) {
         LOG(ERROR) << "service " << service_name << " does not have a SELinux domain defined";
-/*        if (selinux_status_getenforce() > 0) {
+        if (selinux_status_getenforce() > 0) {
             return "";
         }
-*/
     }
-
     if (rc < 0) {
         LOG(ERROR) << "could not get context while starting '" << service_name << "'";
         return "";
@@ -119,7 +117,7 @@ static void SetUpPidNamespace(const std::string& service_name) {
     if (child_pid > 0) {
         // So that we exit with the right status.
         static int init_exitstatus = 0;
-        signal(SIGTERM, [](int) { PLOG(ERROR) << "SetUpPidNamespace (child_pid > 0)"; _exit(init_exitstatus); });
+        signal(SIGTERM, [](int) { _exit(init_exitstatus); });
 
         pid_t waited_pid;
         int status;
@@ -132,12 +130,8 @@ static void SetUpPidNamespace(const std::string& service_name) {
             }
         }
         if (!WIFEXITED(init_exitstatus)) {
-	    PLOG(ERROR) << "SetUpPidNamespace (init_exitstatus)";
             _exit(EXIT_FAILURE);
         }
-
-	PLOG(ERROR) << "SetUpPidNamespace";
-
         _exit(WEXITSTATUS(init_exitstatus));
     }
 }

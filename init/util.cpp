@@ -376,11 +376,6 @@ void panic() {
     DoReboot(ANDROID_RB_RESTART2, "reboot", "bootloader", false);
 }
 
-void panic1(char *reason) {
-    LOG(ERROR) << "panic: rebooting to recovery: " << reason;
-    DoReboot(ANDROID_RB_RESTART2, "reboot", "recovery", false);
-}
-
 static std::string init_android_dt_dir() {
     // Use the standard procfs-based path by default
     std::string android_dt_dir = kDefaultAndroidDtDir;
