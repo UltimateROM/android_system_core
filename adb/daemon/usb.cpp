@@ -64,7 +64,7 @@ using namespace std::chrono_literals;
 
 #define FUNCTIONFS_ENDPOINT_ALLOC       _IOR('g', 231, __u32)
 
-#ifndef LEGACY_ADB_INTERFACE
+#if 0
 static constexpr size_t ENDPOINT_ALLOC_RETRIES = 10;
 #endif
 
@@ -107,7 +107,7 @@ struct desc_v2 {
     struct usb_ext_compat_desc os_desc;
 } __attribute__((packed));
 
-#ifdef LEGACY_ADB_INTERFACE
+#if 1
 static void usb_adb_open_thread(void* x) {
     struct usb_handle *usb = (struct usb_handle *)x;
     int fd;
@@ -597,7 +597,7 @@ static void usb_ffs_init() {
 void usb_init() {
     dummy_fd = adb_open("/dev/null", O_WRONLY);
     CHECK_NE(dummy_fd, -1);
-#ifdef LEGACY_ADB_INTERFACE
+#if 1
     usb_adb_init();
 #else
     usb_ffs_init();

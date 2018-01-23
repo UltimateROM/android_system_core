@@ -177,7 +177,7 @@ int adbd_main(int server_port) {
     drop_privileges(server_port);
 
     bool is_usb = false;
-#ifdef LEGACY_ADB_INTERFACE
+#if 1
     if (access(USB_ADB_PATH, F_OK) == 0) {
 #else
     if (access(USB_FFS_ADB_EP0, F_OK) == 0) {
