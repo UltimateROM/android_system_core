@@ -570,18 +570,48 @@ static void selinux_init_all_handles(void)
     sehandle_prop = selinux_android_prop_context_handle();
 }
 
-enum selinux_enforcing_status { SELINUX_PERMISSIVE, SELINUX_ENFORCING };
+enum selinux_enforcing_status { SELINUX_DISABLED, SELINUX_PERMISSIVE, SELINUX_ENFORCING };
 
+#if 0
 static selinux_enforcing_status selinux_status_from_cmdline() {
     selinux_enforcing_status status = SELINUX_ENFORCING;
 
-    import_kernel_cmdline(false, [&](const std::string& key, const std::string& value, bool in_qemu) {
-        if (key == "androidboot.selinux" && value == "permissive") {
-            status = SELINUX_PERMISSIVE;
-        }
-    });
+    std::function<void(char*,bool)> fn = [&](char* name, bool in_qemu) {
+        char *value = strchr(name, '=');
+        if (value == nullptr) { return; }
+        *value++ = '\0';
+        if (strcmp(name, "androidboot.selinux") == 0) {
+            if (strcmp(value, "disabled") == 0) {
+                status = SELINUX_DISABLED;
+            } else if (strcmp(value, "permissive") == 0) {
+                status = SELINUX_PERMISSIVE;
+            }
+         }
+     });
 
-    return status;
+     return status;
+ }
+#endif
+
+static bool selinux_is_disabled(void)
+{
+     return true;
+#if 0
+    if (ALLOW_DISABLE_SELINUX) {
+        if (access("/sys/fs/selinux", F_OK) != 0) {
+            // SELinux is not compiled into the kernel, or has been disabled
+            // via the kernel command line "selinux=0".
+            return true;
+        }
+        return true /*selinux_status_from_cmdline() == SELINUX_DISABLED */;
+    }
+    return false;
+#endif
+}
+
+static bool selinux_is_enforcing(void)
+{
+    return false;
 }
 
 static int audit_callback(void *data, security_class_t /*cls*/, char *buf, size_t len) {
@@ -641,6 +671,7 @@ static bool fork_execve_and_wait_for_completion(const char* filename, char* cons
         }
         // Unreachable because execve will have succeeded and replaced this code
         // with child process's code.
+        PLOG(ERROR) << "fork_execve_and_wait_for_completion";
         _exit(127);
         return false;
     } else {
@@ -873,20 +904,18 @@ static void selinux_initialize(bool in_kernel_domain) {
     cb.func_audit = audit_callback;
     selinux_set_callback(SELINUX_CB_AUDIT, cb);
 
+    if (selinux_is_disabled()) {
+        return;
+    }
+
     if (in_kernel_domain) {
         LOG(INFO) << "Loading SELinux policy";
         if (!selinux_load_policy()) {
             panic();
         }
 
-        bool kernel_enforcing = (security_getenforce() == 1);
         bool is_enforcing = false;
-        if (kernel_enforcing != is_enforcing) {
-            if (security_setenforce(is_enforcing)) {
-                PLOG(ERROR) << "security_setenforce(%s) failed" << (is_enforcing ? "true" : "false");
-                security_failure();
-            }
-        }
+        security_setenforce(is_enforcing);
 
         std::string err;
         if (!WriteFile("/sys/fs/selinux/checkreqprot", "0", &err)) {
@@ -906,6 +935,7 @@ static void selinux_initialize(bool in_kernel_domain) {
 // value. This must happen before /dev is populated by ueventd.
 static void selinux_restore_context() {
     LOG(INFO) << "Running restorecon...";
+    if (is_selinux_enabled()) {
     selinux_android_restorecon("/dev", 0);
     selinux_android_restorecon("/dev/kmsg", 0);
     selinux_android_restorecon("/dev/socket", 0);
@@ -931,6 +961,7 @@ static void selinux_restore_context() {
 
     selinux_android_restorecon("/sbin/mke2fs_static", 0);
     selinux_android_restorecon("/sbin/e2fsdroid_static", 0);
+    }
 }
 
 // Set the UDC controller for the ConfigFS USB Gadgets.
@@ -949,6 +980,8 @@ static void set_usb_controller() {
     }
 }
 
+void panic1(char *reason);
+
 static void InstallRebootSignalHandlers() {
     // Instead of panic'ing the kernel as is the default behavior when init crashes,
     // we prefer to reboot to bootloader on development builds, as this will prevent
@@ -965,9 +998,7 @@ static void InstallRebootSignalHandlers() {
         }
 
         // panic() reboots to bootloader
-        panic();
-        // panic1() reboots to recovery
-        panic1();
+        panic1("sa_handler");
     };
     action.sa_flags = SA_RESTART;
     sigaction(SIGABRT, &action, nullptr);
@@ -1012,13 +1043,14 @@ int main(int argc, char** argv) {
         mkdir("/dev/socket", 0755);
         mount("devpts", "/dev/pts", "devpts", 0, NULL);
         #define MAKE_STR(x) __STRING(x)
-        mount("proc", "/proc", "proc", 0, "hidepid=2,gid=" MAKE_STR(AID_READPROC));
+        mount("proc", "/proc", "proc", 0, "gid=" MAKE_STR(AID_READPROC));
         // Don't expose the raw commandline to unprivileged processes.
         chmod("/proc/cmdline", 0440);
         gid_t groups[] = { AID_READPROC };
         setgroups(arraysize(groups), groups);
         mount("sysfs", "/sys", "sysfs", 0, NULL);
-        mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL);
+        if (is_selinux_enabled())
+           mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", 0, NULL);
         mknod("/dev/kmsg", S_IFCHR | 0600, makedev(1, 11));
         mknod("/dev/random", S_IFCHR | 0666, makedev(1, 8));
         mknod("/dev/urandom", S_IFCHR | 0666, makedev(1, 9));
@@ -1035,26 +1067,38 @@ int main(int argc, char** argv) {
         }
 
         SetInitAvbVersionInRecovery();
+        LOG(INFO) << "SetInitAvbVersionInRecovery";
 
         // Set up SELinux, loading the SELinux policy.
         selinux_initialize(true);
+        LOG(INFO) << "selinux_initialize";
 
         // We're in the kernel domain, so re-exec init to transition to the init domain now
         // that the SELinux policy has been loaded.
-        if (selinux_android_restorecon("/init", 0) == -1) {
-            PLOG(ERROR) << "restorecon failed";
-            security_failure();
+        if (is_selinux_enabled()) {
+           if (selinux_android_restorecon("/init", 0) == -1) {
+               PLOG(ERROR) << "restorecon failed";
+               security_failure();
+           }
         }
+        LOG(INFO) << "restorecon (/init)";
+
 
         setenv("INIT_SECOND_STAGE", "true", 1);
+        LOG(INFO) << "INIT_SECOND_STAGE";
+
 
         static constexpr uint32_t kNanosecondsPerMillisecond = 1e6;
         uint64_t start_ms = start_time.time_since_epoch().count() / kNanosecondsPerMillisecond;
         setenv("INIT_STARTED_AT", std::to_string(start_ms).c_str(), 1);
+        LOG(INFO) << "INIT_STARTED_AT";
 
         char* path = argv[0];
         char* args[] = { path, nullptr };
+
+        LOG(INFO) << "execv(" << path << ")";
         execv(path, args);
+
 
         // execv() only returns if an error happened, in which case we
         // panic and never fall through this conditional.
@@ -1070,38 +1114,53 @@ int main(int argc, char** argv) {
     // will hold things like FBE encryption keys. No process should override
     // its session keyring.
     keyctl_get_keyring_ID(KEY_SPEC_SESSION_KEYRING, 1);
+    LOG(INFO) << "KEYCTL_GET_KEYRING_ID,";
 
     // Indicate that booting is in progress to background fw loaders, etc.
     close(open("/dev/.booting", O_WRONLY | O_CREAT | O_CLOEXEC, 0000));
+    LOG(INFO) << "/dev/.booting";
 
     property_init();
+    LOG(INFO) << "property_init";
 
     // If arguments are passed both on the command line and in DT,
     // properties set in DT always have priority over the command-line ones.
     process_kernel_dt();
+    LOG(INFO) << "process_kernel_dt";
+
     process_kernel_cmdline();
+    LOG(INFO) << "process_kernel_cmdline";
 
     // Propagate the kernel variables to internal variables
     // used by init as well as the current required properties.
     export_kernel_boot_props();
+    LOG(INFO) << "export_kernel_boot_props";
 
     // Make the time that init started available for bootstat to log.
     property_set("ro.boottime.init", getenv("INIT_STARTED_AT"));
+    LOG(INFO) << "ro.boottime.init";
+/*
     property_set("ro.boottime.init.selinux", getenv("INIT_SELINUX_TOOK"));
-
+    LOG(INFO) << "ro.boottime.init.selinux";
+*/
     // Set libavb version for Framework-only OTA match in Treble build.
     const char* avb_version = getenv("INIT_AVB_VERSION");
     if (avb_version) property_set("ro.boot.avb_version", avb_version);
+    LOG(INFO) << "INIT_AVB_VERSION";
 
     // Clean up our environment.
     unsetenv("INIT_SECOND_STAGE");
     unsetenv("INIT_STARTED_AT");
     unsetenv("INIT_SELINUX_TOOK");
     unsetenv("INIT_AVB_VERSION");
+    LOG(INFO) << "Clean up our environment";
 
     // Now set up SELinux for second stage.
     selinux_initialize(false);
+    LOG(INFO) << "selinux_initialize(false)";
+
     selinux_restore_context();
+    LOG(INFO) << "selinux_restore_context";
 
     epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (epoll_fd == -1) {
@@ -1110,14 +1169,20 @@ int main(int argc, char** argv) {
     }
 
     signal_handler_init();
+    LOG(INFO) << "signal_handler_init";
 
     property_load_boot_defaults();
+    LOG(INFO) << "property_load_boot_defaults";
     export_oem_lock_status();
+    LOG(INFO) << "export_oem_lock_status";
     start_property_service();
+    LOG(INFO) << "start_property_service";
     set_usb_controller();
+    LOG(INFO) << "set_usb_controller";
 
     const BuiltinFunctionMap function_map;
     Action::set_function_map(&function_map);
+    LOG(INFO) << "set_function_map";
 
     ActionManager& am = ActionManager::GetInstance();
     ServiceManager& sm = ServiceManager::GetInstance();
@@ -1126,19 +1191,36 @@ int main(int argc, char** argv) {
     parser.AddSectionParser("service", std::make_unique<ServiceParser>(&sm));
     parser.AddSectionParser("on", std::make_unique<ActionParser>(&am));
     parser.AddSectionParser("import", std::make_unique<ImportParser>(&parser));
+    LOG(INFO) << "parser";
+
     std::string bootscript = GetProperty("ro.boot.init_rc", "");
+    LOG(INFO) << "bootscript start";
+
     if (bootscript.empty()) {
         parser.ParseConfig("/init.rc");
+        LOG(INFO) << "parser.ParseConfig";
+
         parser.set_is_system_etc_init_loaded(
                 parser.ParseConfig("/system/etc/init"));
+        LOG(INFO) << "parser.set_is_system_etc_init_loaded";
+
         parser.set_is_vendor_etc_init_loaded(
                 parser.ParseConfig("/vendor/etc/init"));
+
+        LOG(INFO) << "parser.set_is_vendor_etc_init_loaded";
+
         parser.set_is_odm_etc_init_loaded(parser.ParseConfig("/odm/etc/init"));
+        LOG(INFO) << "parser.set_is_odm_etc_init_loaded";
     } else {
         parser.ParseConfig(bootscript);
+        LOG(INFO) << "parser.ParseConfig(bootscript)";
+
         parser.set_is_system_etc_init_loaded(true);
+        LOG(INFO) << "parser.set_is_system_etc_init_loaded";
         parser.set_is_vendor_etc_init_loaded(true);
+        LOG(INFO) << "parser.set_is_vendor_etc_init_loaded";
         parser.set_is_odm_etc_init_loaded(true);
+        LOG(INFO) << "parser.set_is_odm_etc_init_loaded";
     }
 
     // Turning this on and letting the INFO logging be discarded adds 0.2s to
@@ -1146,9 +1228,12 @@ int main(int argc, char** argv) {
     if (false) DumpState();
 
     am.QueueEventTrigger("early-init");
+    LOG(INFO) << "early-init";
 
     // Queue an action that waits for coldboot done so we know ueventd has set up all of /dev...
     am.QueueBuiltinAction(wait_for_coldboot_done_action, "wait_for_coldboot_done");
+    LOG(INFO) << "wait_for_coldboot_done";
+
     // ... so that we can start queuing up actions that require stuff from /dev.
     am.QueueBuiltinAction(mix_hwrng_into_linux_rng_action, "mix_hwrng_into_linux_rng");
     am.QueueBuiltinAction(set_mmap_rnd_bits_action, "set_mmap_rnd_bits");
@@ -1156,12 +1241,16 @@ int main(int argc, char** argv) {
     am.QueueBuiltinAction(keychord_init_action, "keychord_init");
     am.QueueBuiltinAction(console_init_action, "console_init");
 
+    LOG(INFO) << "console_init";
+
     // Trigger all the boot actions to get us started.
     am.QueueEventTrigger("init");
+    LOG(INFO) << "am.QueueEventTrigger(\"init\")";
 
     // Repeat mix_hwrng_into_linux_rng in case /dev/hw_random or /dev/random
     // wasn't ready immediately after wait_for_coldboot_done
     am.QueueBuiltinAction(mix_hwrng_into_linux_rng_action, "mix_hwrng_into_linux_rng");
+    LOG(INFO) << "mix_hwrng_into_linux_rng";
 
     // Don't mount filesystems or start core system services in charger mode.
     std::string bootmode = GetProperty("ro.bootmode", "");
@@ -1170,9 +1259,11 @@ int main(int argc, char** argv) {
     } else {
         am.QueueEventTrigger("late-init");
     }
+    LOG(INFO) << "am.QueueEventTrigger late-init";
 
     // Run all property triggers based on current state of the properties.
     am.QueueBuiltinAction(queue_property_triggers_action, "queue_property_triggers");
+    LOG(INFO) << "queue_property_triggers_action";
 
     while (true) {
         // By default, sleep until something happens.
@@ -1209,6 +1300,7 @@ int main(int argc, char** argv) {
             ((void (*)()) ev.data.ptr)();
         }
     }
+    LOG(INFO) << "while (true)";
 
     return 0;
 }

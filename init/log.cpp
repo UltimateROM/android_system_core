@@ -28,17 +28,20 @@ namespace init {
 
 void InitKernelLogging(char* argv[]) {
     // Make stdin/stdout/stderr all point to /dev/null.
-    int fd = open("/sys/fs/selinux/null", O_RDWR);
-    if (fd == -1) {
-        int saved_errno = errno;
-        android::base::InitLogging(argv, &android::base::KernelLogger);
-        errno = saved_errno;
-        PLOG(FATAL) << "Couldn't open /sys/fs/selinux/null";
+    if (is_selinux_enabled()) {
+       int fd = open("/sys/fs/selinux/null", O_RDWR);
+       if (fd == -1) {
+          int saved_errno = errno;
+          android::base::InitLogging(argv, &android::base::KernelLogger);
+          errno = saved_errno;
+          PLOG(FATAL) << "Couldn't open /sys/fs/selinux/null";
+       }
+
+       dup2(fd, 0);
+       dup2(fd, 1);
+       dup2(fd, 2);
+       if (fd > 2) close(fd);
     }
-    dup2(fd, 0);
-    dup2(fd, 1);
-    dup2(fd, 2);
-    if (fd > 2) close(fd);
 
     android::base::InitLogging(argv, &android::base::KernelLogger);
 }

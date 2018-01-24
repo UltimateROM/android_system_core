@@ -91,10 +91,7 @@ bool DecodeUid(const std::string& name, uid_t* uid, std::string* err) {
 int CreateSocket(const char* name, int type, bool passcred, mode_t perm, uid_t uid, gid_t gid,
                  const char* socketcon, selabel_handle* sehandle) {
     if (socketcon) {
-        if (setsockcreatecon(socketcon) == -1) {
-            PLOG(ERROR) << "setsockcreatecon(\"" << socketcon << "\") failed";
-            return -1;
-        }
+        setsockcreatecon(socketcon);
     }
 
     android::base::unique_fd fd(socket(PF_UNIX, type, 0));
@@ -371,14 +368,12 @@ bool expand_props(const std::string& src, std::string* dst) {
 }
 
 void panic() {
-    LOG(ERROR) << "panic: rebooting to bootloader";
-    // Do not queue "shutdown" trigger since we want to shutdown immediately
-    DoReboot(ANDROID_RB_RESTART2, "reboot", "bootloader", false);
+    LOG(ERROR) << "panic: rebooting to recovery";
+    DoReboot(ANDROID_RB_RESTART2, "reboot", "recovery", false);
 }
 
-void panic1() {
-    LOG(ERROR) << "panic: rebooting to recovery";
-    // Do not queue "shutdown" trigger since we want to shutdown immediately
+void panic1(char *reason) {
+    LOG(ERROR) << "panic: rebooting to recovery: " << reason;
     DoReboot(ANDROID_RB_RESTART2, "reboot", "recovery", false);
 }
 

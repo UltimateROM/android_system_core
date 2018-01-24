@@ -4,19 +4,12 @@ LOCAL_PATH:= $(call my-dir)
 
 # --
 
-ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 init_options += \
     -DALLOW_LOCAL_PROP_OVERRIDE=1 \
     -DALLOW_PERMISSIVE_SELINUX=1 \
     -DREBOOT_BOOTLOADER_ON_PANIC=0 \
+    -DALLOW_DISABLE_SELINUX=1 \
     -DDUMP_ON_UMOUNT_FAILURE=1
-else
-init_options += \
-    -DALLOW_LOCAL_PROP_OVERRIDE=0 \
-    -DALLOW_PERMISSIVE_SELINUX=0 \
-    -DREBOOT_BOOTLOADER_ON_PANIC=0 \
-    -DDUMP_ON_UMOUNT_FAILURE=0
-endif
 
 ifneq (,$(filter eng,$(TARGET_BUILD_VARIANT)))
 init_options += \
@@ -55,9 +48,9 @@ LOCAL_SRC_FILES:= \
     watchdogd.cpp \
     vendor_init.cpp
 
-ifeq ($(KERNEL_HAS_FINIT_MODULE), false)
+#ifeq ($(KERNEL_HAS_FINIT_MODULE), false)
 LOCAL_CFLAGS += -DNO_FINIT_MODULE
-endif
+#endif
 
 LOCAL_MODULE:= init
 LOCAL_C_INCLUDES += \
