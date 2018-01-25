@@ -20,7 +20,6 @@
 
 #include <fcntl.h>
 #include <inttypes.h>
-#include <libavb_user/libavb_user.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -38,7 +37,7 @@
 #include "fec/io.h"
 
 struct fstab *fstab;
-
+#if 0
 #ifdef ALLOW_ADBD_DISABLE_VERITY
 static const bool kAllowDisableVerity = true;
 #else
@@ -46,8 +45,9 @@ static const bool kAllowDisableVerity = false;
 #endif
 
 /* Turn verity on/off */
-static bool set_verity_enabled_state(int fd, const char* block_device, const char* mount_point,
-                                     bool enable) {
+static bool set_verity_enabled_state(int /*fd*/, const char* /*block_device*/, const char* /*mount_point*/,
+                                     bool /*enable*/) {
+/*
     if (!make_block_device_writable(block_device)) {
         WriteFdFmt(fd, "Could not make block device %s writable (%s).\n",
                    block_device, strerror(errno));
@@ -87,9 +87,12 @@ static bool set_verity_enabled_state(int fd, const char* block_device, const cha
     }
 
     WriteFdFmt(fd, "Verity %s on %s\n", enable ? "enabled" : "disabled", mount_point);
+*/
     return true;
 }
+#endif
 
+#if 0
 /* Helper function to get A/B suffix, if any. If the device isn't
  * using A/B the empty string is returned. Otherwise either "_a",
  * "_b", ... is returned.
@@ -111,7 +114,8 @@ static std::string get_ab_suffix() {
 }
 
 /* Use AVB to turn verity on/off */
-static bool set_avb_verity_enabled_state(int fd, AvbOps* ops, bool enable_verity) {
+static bool set_avb_verity_enabled_state(int /*fd*/, AvbOps* /*ops*/, bool /*enable_verity */) {
+/*
     std::string ab_suffix = get_ab_suffix();
 
     bool verity_enabled;
@@ -131,10 +135,13 @@ static bool set_avb_verity_enabled_state(int fd, AvbOps* ops, bool enable_verity
     }
 
     WriteFdFmt(fd, "Successfully %s verity\n", enable_verity ? "enabled" : "disabled");
+*/
     return true;
 }
+#endif
 
-void set_verity_enabled_state_service(int fd, void* cookie) {
+void set_verity_enabled_state_service(int /*fd*/, void* /*cookie*/) {
+/*
     unique_fd closer(fd);
     bool any_changed = false;
 
@@ -202,4 +209,5 @@ void set_verity_enabled_state_service(int fd, void* cookie) {
     if (any_changed) {
         WriteFdFmt(fd, "Now reboot your device for settings to take effect\n");
     }
+*/
 }

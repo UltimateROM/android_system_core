@@ -228,7 +228,6 @@ LOCAL_SANITIZE := $(adb_target_sanitize)
 LOCAL_STRIP_MODULE := keep_symbols
 LOCAL_STATIC_LIBRARIES := \
     libadbd \
-    libavb_user \
     libbase \
     libqemu_pipe \
     libbootloader_message \
