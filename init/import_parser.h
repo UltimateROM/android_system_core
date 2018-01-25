@@ -22,25 +22,22 @@
 #include <string>
 #include <vector>
 
-namespace android {
-namespace init {
-
 class ImportParser : public SectionParser {
-  public:
-    ImportParser(Parser* parser) : parser_(parser) {}
-    bool ParseSection(std::vector<std::string>&& args, const std::string& filename, int line,
+public:
+    ImportParser()  {
+    }
+    bool ParseSection(const std::vector<std::string>& args,
                       std::string* err) override;
-    void EndFile() override;
-
-  private:
-    Parser* parser_;
-    // Store filename for later error reporting.
-    std::string filename_;
-    // Vector of imports and their line numbers for later error reporting.
-    std::vector<std::pair<std::string, int>> imports_;
+    bool ParseLineSection(const std::vector<std::string>& args,
+                          const std::string& filename, int line,
+                          std::string* err) const override {
+        return true;
+    }
+    void EndSection() override {
+    }
+    void EndFile(const std::string& filename) override;
+private:
+    std::vector<std::string> imports_;
 };
-
-}  // namespace init
-}  // namespace android
 
 #endif

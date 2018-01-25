@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 The Android Open Source Project
+ * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,39 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef _INIT_UEVENTD_PARSER_H
-#define _INIT_UEVENTD_PARSER_H
+#ifndef _INIT_UEVENTD_PARSER_H_
+#define _INIT_UEVENTD_PARSER_H_
 
-#include <string>
-#include <vector>
+#include "ueventd.h"
 
-#include "devices.h"
-#include "init_parser.h"
+#define UEVENTD_PARSER_MAXARGS 5
 
-namespace android {
-namespace init {
-
-class SubsystemParser : public SectionParser {
-  public:
-    SubsystemParser(std::vector<Subsystem>* subsystems) : subsystems_(subsystems) {}
-    bool ParseSection(std::vector<std::string>&& args, const std::string& filename, int line,
-                      std::string* err) override;
-    bool ParseLineSection(std::vector<std::string>&& args, int line, std::string* err) override;
-    void EndSection() override;
-
-  private:
-    bool ParseDevName(std::vector<std::string>&& args, std::string* err);
-    bool ParseDirName(std::vector<std::string>&& args, std::string* err);
-
-    Subsystem subsystem_;
-    std::vector<Subsystem>* subsystems_;
-};
-
-bool ParsePermissionsLine(std::vector<std::string>&& args, std::string* err,
-                          std::vector<SysfsPermissions>* out_sysfs_permissions,
-                          std::vector<Permissions>* out_dev_permissions);
-
-}  // namespace init
-}  // namespace android
+int ueventd_parse_config_file(const char *fn);
+void set_device_permission(int nargs, char **args);
+struct ueventd_subsystem *ueventd_subsystem_find_by_name(const char *name);
 
 #endif

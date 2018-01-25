@@ -17,15 +17,9 @@
 #ifndef _INIT_KEYCHORDS_H_
 #define _INIT_KEYCHORDS_H_
 
-#include "service.h"
+struct service;
 
-namespace android {
-namespace init {
-
-void add_service_keycodes(Service* svc);
+void add_service_keycodes(service*);
 void keychord_init();
-
-}  // namespace init
-}  // namespace android
 
 #endif

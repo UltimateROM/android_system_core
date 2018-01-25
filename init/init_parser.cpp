@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-#include "init_parser.h"
-
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 
-#include <android-base/chrono_utils.h>
-#include <android-base/logging.h>
-#include <android-base/stringprintf.h>
-#include <android-base/strings.h>
-
+#include "action.h"
+#include "init_parser.h"
+#include "log.h"
 #include "parser.h"
+#include "service.h"
 #include "util.h"
 
-namespace android {
-namespace init {
+#include <android-base/stringprintf.h>
 
 Parser::Parser() {
 }
@@ -42,16 +40,13 @@ void Parser::AddSectionParser(const std::string& name,
     section_parsers_[name] = std::move(parser);
 }
 
-void Parser::AddSingleLineParser(const std::string& prefix, LineCallback callback) {
-    line_callbacks_.emplace_back(prefix, callback);
-}
-
 void Parser::ParseData(const std::string& filename, const std::string& data) {
     //TODO: Use a parser with const input and remove this copy
     std::vector<char> data_copy(data.begin(), data.end());
     data_copy.push_back('\0');
 
     parse_state state;
+    state.filename = filename.c_str();
     state.line = 0;
     state.ptr = &data_copy[0];
     state.nexttoken = 0;
@@ -71,34 +66,21 @@ void Parser::ParseData(const std::string& filename, const std::string& data) {
             if (args.empty()) {
                 break;
             }
-            // If we have a line matching a prefix we recognize, call its callback and unset any
-            // current section parsers.  This is meant for /sys/ and /dev/ line entries for uevent.
-            for (const auto& [prefix, callback] : line_callbacks_) {
-                if (android::base::StartsWith(args[0], prefix.c_str())) {
-                    if (section_parser) section_parser->EndSection();
-
-                    std::string ret_err;
-                    if (!callback(std::move(args), &ret_err)) {
-                        LOG(ERROR) << filename << ": " << state.line << ": " << ret_err;
-                    }
-                    section_parser = nullptr;
-                    break;
-                }
-            }
             if (section_parsers_.count(args[0])) {
                 if (section_parser) {
                     section_parser->EndSection();
                 }
                 section_parser = section_parsers_[args[0]].get();
                 std::string ret_err;
-                if (!section_parser->ParseSection(std::move(args), filename, state.line, &ret_err)) {
-                    LOG(ERROR) << filename << ": " << state.line << ": " << ret_err;
+                if (!section_parser->ParseSection(args, &ret_err)) {
+                    parse_error(&state, "%s\n", ret_err.c_str());
                     section_parser = nullptr;
                 }
             } else if (section_parser) {
                 std::string ret_err;
-                if (!section_parser->ParseLineSection(std::move(args), state.line, &ret_err)) {
-                    LOG(ERROR) << filename << ": " << state.line << ": " << ret_err;
+                if (!section_parser->ParseLineSection(args, state.filename,
+                                                      state.line, &ret_err)) {
+                    parse_error(&state, "%s\n", ret_err.c_str());
                 }
             }
             args.clear();
@@ -112,18 +94,16 @@ void Parser::ParseData(const std::string& filename, const std::string& data) {
 
 bool Parser::ParseConfigFile(const std::string& path) {
     LOG(INFO) << "Parsing file " << path << "...";
-    android::base::Timer t;
+    Timer t;
     std::string data;
-    std::string err;
-    if (!ReadFile(path, &data, &err)) {
-        LOG(ERROR) << err;
+    if (!read_file(path, &data)) {
         return false;
     }
 
     data.push_back('\n'); // TODO: fix parse_config.
     ParseData(path, data);
-    for (const auto& [section_name, section_parser] : section_parsers_) {
-        section_parser->EndFile();
+    for (const auto& sp : section_parsers_) {
+        sp.second->EndFile(path);
     }
 
     LOG(VERBOSE) << "(Parsing " << path << " took " << t << ".)";
@@ -164,5 +144,7 @@ bool Parser::ParseConfig(const std::string& path) {
     return ParseConfigFile(path);
 }
 
-}  // namespace init
-}  // namespace android
+void Parser::DumpState() const {
+    ServiceManager::GetInstance().DumpState();
+    ActionManager::GetInstance().DumpState();
+}

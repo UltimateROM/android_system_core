@@ -17,13 +17,7 @@
 #ifndef _INIT_FIRST_STAGE_H
 #define _INIT_FIRST_STAGE_H
 
-namespace android {
-namespace init {
-
 bool DoFirstStageMount();
 void SetInitAvbVersionInRecovery();
-
-}  // namespace init
-}  // namespace android
 
 #endif

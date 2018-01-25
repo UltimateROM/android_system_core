@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-#include "keychords.h"
-
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <linux/keychord.h>
 #include <unistd.h>
 
-#include <android-base/logging.h>
 #include <android-base/properties.h>
 
 #include "init.h"
-
-namespace android {
-namespace init {
+#include "log.h"
+#include "service.h"
 
 static struct input_keychord *keychords = 0;
 static int keychords_count = 0;
@@ -116,6 +114,3 @@ void keychord_init() {
 
     register_epoll_handler(keychord_fd, handle_keychord);
 }
-
-}  // namespace init
-}  // namespace android

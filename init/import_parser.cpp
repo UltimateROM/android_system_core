@@ -16,15 +16,16 @@
 
 #include "import_parser.h"
 
-#include <android-base/logging.h>
+#include "errno.h"
 
+#include <string>
+#include <vector>
+
+#include "log.h"
 #include "util.h"
 
-namespace android {
-namespace init {
-
-bool ImportParser::ParseSection(std::vector<std::string>&& args, const std::string& filename,
-                                int line, std::string* err) {
+bool ImportParser::ParseSection(const std::vector<std::string>& args,
+                                std::string* err) {
     if (args.size() != 2) {
         *err = "single argument needed for import\n";
         return false;
@@ -38,21 +39,16 @@ bool ImportParser::ParseSection(std::vector<std::string>&& args, const std::stri
     }
 
     LOG(INFO) << "Added '" << conf_file << "' to import list";
-    if (filename_.empty()) filename_ = filename;
-    imports_.emplace_back(std::move(conf_file), line);
+    imports_.emplace_back(std::move(conf_file));
     return true;
 }
 
-void ImportParser::EndFile() {
+void ImportParser::EndFile(const std::string& filename) {
     auto current_imports = std::move(imports_);
     imports_.clear();
-    for (const auto& [import, line_num] : current_imports) {
-        if (!parser_->ParseConfig(import)) {
-            PLOG(ERROR) << filename_ << ": " << line_num << ": Could not import file '" << import
-                        << "'";
+    for (const auto& s : current_imports) {
+        if (!Parser::GetInstance().ParseConfig(s)) {
+            PLOG(ERROR) << "could not import file '" << s << "' from '" << filename << "'";
         }
     }
 }
-
-}  // namespace init
-}  // namespace android

@@ -17,16 +17,10 @@
 #ifndef _INIT_LOG_H_
 #define _INIT_LOG_H_
 
-#include <sys/cdefs.h>
-
-namespace android {
-namespace init {
+#include <android-base/logging.h>
 
 void InitKernelLogging(char* argv[]);
 
 int selinux_klog_callback(int level, const char* fmt, ...) __printflike(2, 3);
-
-}  // namespace init
-}  // namespace android
 
 #endif
