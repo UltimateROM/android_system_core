@@ -21,6 +21,10 @@ endif
 
 init_options += -DLOG_UEVENTS=0
 
+ifeq ($(TARGET_USER_MODE_LINUX), true)
+    init_cflags += -DUSER_MODE_LINUX
+endif
+
 init_cflags += \
     $(init_options) \
     -Wall -Wextra \
@@ -29,53 +33,11 @@ init_cflags += \
 
 # --
 
-# If building on Linux, then build unit test for the host.
-ifeq ($(HOST_OS),linux)
-include $(CLEAR_VARS)
-LOCAL_CPPFLAGS := $(init_cflags)
-LOCAL_SRC_FILES:= \
-    parser/tokenizer.cpp \
-
-LOCAL_MODULE := libinit_parser
-LOCAL_CLANG := true
-include $(BUILD_HOST_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := init_parser_tests
-LOCAL_SRC_FILES := \
-    parser/tokenizer_test.cpp \
-
-LOCAL_STATIC_LIBRARIES := libinit_parser
-LOCAL_CLANG := true
-#include $(BUILD_HOST_NATIVE_TEST)
-endif
-
-include $(CLEAR_VARS)
-LOCAL_CPPFLAGS := $(init_cflags)
-LOCAL_SRC_FILES:= \
-    action.cpp \
-    capabilities.cpp \
-    descriptors.cpp \
-    import_parser.cpp \
-    init_parser.cpp \
-    log.cpp \
-    parser.cpp \
-    service.cpp \
-    util.cpp \
-
-LOCAL_STATIC_LIBRARIES := libbase libselinux liblog libprocessgroup
-LOCAL_WHOLE_STATIC_LIBRARIES := libcap
-LOCAL_MODULE := libinit
-LOCAL_SANITIZE := integer
-LOCAL_CLANG := true
-include $(BUILD_STATIC_LIBRARY)
-
 include $(CLEAR_VARS)
 LOCAL_CPPFLAGS := $(init_cflags)
 LOCAL_SRC_FILES:= \
     bootchart.cpp \
     builtins.cpp \
-    devices.cpp \
     init.cpp \
     init_first_stage.cpp \
     keychords.cpp \
@@ -83,7 +45,6 @@ LOCAL_SRC_FILES:= \
     reboot.cpp \
     signal_handler.cpp \
     ueventd.cpp \
-    ueventd_parser.cpp \
     watchdogd.cpp \
     vendor_init.cpp
 
@@ -120,14 +81,19 @@ LOCAL_STATIC_LIBRARIES := \
     libsparse \
     libz \
     libprocessgroup \
-    libavb
+    libavb \
+    libkeyutils \
+
+LOCAL_REQUIRED_MODULES := \
+    e2fsdroid \
+    mke2fs \
 
 # Create symlinks.
 LOCAL_POST_INSTALL_CMD := $(hide) mkdir -p $(TARGET_ROOT_OUT)/sbin; \
     ln -sf ../init $(TARGET_ROOT_OUT)/sbin/ueventd; \
     ln -sf ../init $(TARGET_ROOT_OUT)/sbin/watchdogd
 
-LOCAL_SANITIZE := integer
+LOCAL_SANITIZE := signed-integer-overflow
 LOCAL_CLANG := true
 
 ifneq ($(strip $(TARGET_INIT_VENDOR_LIB)),)
@@ -135,8 +101,3 @@ LOCAL_WHOLE_STATIC_LIBRARIES += $(TARGET_INIT_VENDOR_LIB)
 endif
 
 include $(BUILD_EXECUTABLE)
-
-
-# Include targets in subdirs.
-# =========================================================
-#include $(call all-makefiles-under,$(LOCAL_PATH))

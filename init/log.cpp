@@ -23,6 +23,9 @@
 #include <android-base/logging.h>
 #include <selinux/selinux.h>
 
+namespace android {
+namespace init {
+
 void InitKernelLogging(char* argv[]) {
     // Make stdin/stdout/stderr all point to /dev/null.
     if (is_selinux_enabled()) {
@@ -58,3 +61,6 @@ int selinux_klog_callback(int type, const char *fmt, ...) {
     android::base::KernelLogger(android::base::MAIN, severity, "selinux", nullptr, 0, buf);
     return 0;
 }
+
+}  // namespace init
+}  // namespace android
