@@ -873,6 +873,15 @@ bool Thread::exitPending() const
     return mExitPending;
 }
 
-
-
 };  // namespace android
+
+extern "C" pid_t androidGetTid()
+{
+#ifdef HAVE_GETTID
+    #warning HAVE_GETTID 1
+    return gettid();
+#else
+    #warning HAVE_GETTID 0
+    return getpid();
+#endif
+}
